@@ -10,29 +10,41 @@ const isPdfPage = () => {
     document.contentType === 'application/pdf';
 };
 
+// Cache for validation results to prevent network storms
+const validationCache = new Map();
+
 // Validate URL accessibility and type
 async function validatePdfUrl(url) {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    const response = await fetch(url, {
-      method: 'HEAD',
-      signal: controller.signal,
-      mode: 'no-cors' // Avoid CORS issues for HEAD requests
-    });
-
-    clearTimeout(timeoutId);
-
-    return {
-      accessible: response.ok || response.type === 'opaque', // opaque = no-cors success
-      contentType: response.headers.get('Content-Type'),
-      status: response.status
-    };
-  } catch (error) {
-    // Timeout or network error
-    return { accessible: false, status: 0, error: error.message };
+  if (validationCache.has(url)) {
+    return validationCache.get(url);
   }
+
+  const validationPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const response = await fetch(url, {
+        method: 'HEAD',
+        signal: controller.signal,
+        mode: 'no-cors' // Avoid CORS issues for HEAD requests
+      });
+
+      clearTimeout(timeoutId);
+
+      return {
+        accessible: response.ok || response.type === 'opaque', // opaque = no-cors success
+        contentType: response.headers.get('Content-Type'),
+        status: response.status
+      };
+    } catch (error) {
+      // Timeout or network error
+      return { accessible: false, status: 0, error: error.message };
+    }
+  })();
+
+  validationCache.set(url, validationPromise);
+  return validationPromise;
 }
 
 // Find all PDF links on the page and group by language
@@ -41,7 +53,13 @@ async function findPdfLinks() {
   const pdfMap = new Map(); // Key: Base form name, Value: Object with details
 
   // Keywords that suggest a link is a form even if no .pdf extension
-  const formKeywords = ['/form/', '/forms/', '/resource/', '/document/', 'form-', '-form', 'application', 'authorization', 'instructions'];
+  // Keywords that suggest a link is a form even if no .pdf extension
+  const formKeywords = [
+    '/form/', '/forms/', '/resource/', '/document/', 'form-', '-form',
+    'application', 'authorization', 'instructions', 'permit',
+    'request', 'guide', 'manual', 'checklist', 'agreement',
+    'contract', 'report', 'survey', 'plan', 'packet'
+  ];
   const excludeKeywords = ['.html', '.php', '.aspx', '.jsp', '#', 'javascript:'];
 
   links.forEach(link => {
@@ -215,16 +233,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Watch for dynamically added PDF links (for infinite scroll, pagination, etc.)
 let lastPdfCount = 0;
 
-const observer = new MutationObserver(async () => {
-  const currentPdfs = await findPdfLinks();
-  if (currentPdfs.length !== lastPdfCount) {
-    lastPdfCount = currentPdfs.length;
-    safeSendMessage({
-      type: 'PDF_LINKS_UPDATED',
-      pdfs: currentPdfs,
-      pageUrl: window.location.href
-    });
-  }
+const observer = new MutationObserver(() => {
+  // Debounce the observer to prevent network storms during rapid loading
+  clearTimeout(window.scanDebounceTimer);
+  window.scanDebounceTimer = setTimeout(async () => {
+    const currentPdfs = await findPdfLinks();
+    if (currentPdfs.length !== lastPdfCount) {
+      lastPdfCount = currentPdfs.length;
+      safeSendMessage({
+        type: 'PDF_LINKS_UPDATED',
+        pdfs: currentPdfs,
+        pageUrl: window.location.href
+      });
+    }
+  }, 500); // Wait 500ms after last mutation
 });
 
 // Start observing for DOM changes
