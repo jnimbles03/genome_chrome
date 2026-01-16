@@ -32,7 +32,7 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
     # Models
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash") # Updated to correct 1.5 flash name
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash") # Updated to correct 2.5 flash name
     
     # Logic to select best available Anthropic model
     # Priority: Env Var (Sane) -> Opus (Fallback)

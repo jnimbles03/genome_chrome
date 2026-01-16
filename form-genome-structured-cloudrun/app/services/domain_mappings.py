@@ -116,6 +116,8 @@ DOMAIN_TO_ENTITY = {
     "bluecrossma.com": "Blue Cross Blue Shield of Massachusetts",
     "bcbs.com": "Blue Cross Blue Shield Association",
     "kaiser.com": "Kaiser Permanente",
+    "clevelandcliniclabs.com": "Cleveland Clinic Laboratories",
+    "clevelandclinic.org": "Cleveland Clinic",
 
     # Utilities & Services
     "pge.com": "Pacific Gas and Electric Company",
