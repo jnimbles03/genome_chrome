@@ -535,6 +535,25 @@ def form_exists(url: str) -> bool:
     return get_form(url) is not None
 
 
+def delete_forms(form_ids: List[int]) -> int:
+    """
+    Delete batches of forms by ID.
+    Returns number of deleted records.
+    """
+    if not form_ids:
+        return 0
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        # Use simple IN clause for deletion
+        format_strings = ','.join(['%s'] * len(form_ids))
+        cursor.execute(f"DELETE FROM forms WHERE id IN ({format_strings})", tuple(form_ids))
+        
+        deleted_count = cursor.rowcount
+        logger.info(f"Deleted {deleted_count} forms: {form_ids}")
+        return deleted_count
+
+
 # =============================================================================
 # Cleanup Operations
 # =============================================================================

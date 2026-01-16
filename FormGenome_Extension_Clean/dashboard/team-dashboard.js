@@ -10,8 +10,10 @@ let draggedColumn = null;
 let currentSortKey = 'analyzed_at';
 let currentSortDirection = 'desc';
 
+let selectedFormIds = new Set();
 // Define all available columns
 const COLUMNS = [
+  { key: 'checkbox', label: '<input type="checkbox" id="selectAllHeader" style="cursor: pointer;">', draggable: false },
   { key: 'actions', label: 'Actions', draggable: false },
   { key: 'form_name', label: 'Form Name', draggable: true },
   { key: 'entity_name', label: 'Entity', draggable: true },
@@ -93,6 +95,10 @@ function setupEventListeners() {
   document.getElementById('filterSelect').addEventListener('change', (e) => {
     filterAndRenderForms();
   });
+
+  // Bulk Actions
+  document.getElementById('bulkDeleteBtn').addEventListener('click', handleBulkDelete);
+  document.getElementById('bulkReanalyzeBtn').addEventListener('click', handleBulkReanalyze);
 }
 
 async function getMyUserId() {
@@ -247,6 +253,9 @@ function renderTable() {
       startEdit(rowId);
     });
   });
+
+  setupCheckboxListeners();
+  updateBulkUI();
 }
 
 function getOrderedColumns() {
@@ -306,6 +315,9 @@ function renderCell(columnKey, form, isMyForm, rowId) {
   const complexityClass = complexity >= 7 ? 'complexity-high' : complexity >= 4 ? 'complexity-medium' : 'complexity-low';
 
   switch (columnKey) {
+    case 'checkbox':
+      return `<td><input type="checkbox" class="row-checkbox" data-analysis-id="${form.analysis_id}" ${selectedFormIds.has(form.analysis_id) ? 'checked' : ''}></td>`;
+
     case 'actions':
       return `<td>${isMyForm ? `<button class="edit-btn" data-edit-row="${rowId}">Edit</button>` : ''}</td>`;
 
@@ -834,4 +846,115 @@ function exportAllToCSV() {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+function setupCheckboxListeners() {
+  const selectAll = document.getElementById('selectAllHeader');
+  // Re-finding it because renderHeaders re-creates it
+  const actualSelectAll = document.querySelector('input[id="selectAllHeader"]'); // ID might be duplicated if strict, but here it's inside TH innerHTML
+
+  if (actualSelectAll) {
+    // Check if all visible are selected
+    const allVisibleSelected = filteredForms.length > 0 && filteredForms.every(f => selectedFormIds.has(f.analysis_id));
+    actualSelectAll.checked = allVisibleSelected;
+
+    actualSelectAll.onclick = (e) => {
+      const checked = e.target.checked;
+      filteredForms.forEach(form => {
+        if (checked) selectedFormIds.add(String(form.analysis_id)); // ensure string
+        else selectedFormIds.delete(String(form.analysis_id));
+      });
+      renderTable();
+    };
+  }
+
+  document.querySelectorAll('.row-checkbox').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const id = e.target.dataset.analysisId;
+      if (e.target.checked) selectedFormIds.add(String(id)); // ensure string
+      else selectedFormIds.delete(String(id));
+      updateBulkUI();
+
+      // Update header checkbox visual state
+      if (actualSelectAll) {
+        const allVisibleSelected = filteredForms.length > 0 && filteredForms.every(f => selectedFormIds.has(f.analysis_id));
+        actualSelectAll.checked = allVisibleSelected;
+      }
+    });
+  });
+}
+
+function updateBulkUI() {
+  const container = document.getElementById('bulkActions');
+  const countSpan = document.getElementById('selectedCountDisplay');
+  const count = selectedFormIds.size;
+
+  if (count > 0) {
+    container.style.display = 'flex';
+    countSpan.textContent = `${count} selected`;
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+async function handleBulkDelete() {
+  if (selectedFormIds.size === 0) return;
+
+  if (!confirm(`Are you sure you want to delete ${selectedFormIds.size} forms? This cannot be undone.`)) {
+    return;
+  }
+
+  showLoading(true);
+  try {
+    const ids = Array.from(selectedFormIds); // IDs are strings from dataset
+    const response = await fetch(`${API_BASE_URL}/api/team/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analysis_ids: ids })
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      selectedFormIds.clear();
+      await loadAllTeamForms();
+      alert(`Deleted ${data.deleted_count} forms.`);
+      updateBulkUI();
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (error) {
+    console.error('Delete failed', error);
+    alert('Delete failed: ' + error.message);
+    showLoading(false);
+  }
+}
+
+async function handleBulkReanalyze() {
+  if (selectedFormIds.size === 0) return;
+
+  if (!confirm(`Re-analyze ${selectedFormIds.size} forms? This will queue them for fresh processing.`)) {
+    return;
+  }
+
+  try {
+    const ids = Array.from(selectedFormIds);
+    const response = await fetch(`${API_BASE_URL}/api/team/reanalyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ analysis_ids: ids })
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      selectedFormIds.clear();
+      renderTable(); // checks uncheck
+      // Don't reload immediately, as it takes time
+      alert(`Queued ${data.queued_count} forms for re-analysis. They will update as they complete.`);
+    } else {
+      throw new Error(data.error);
+    }
+  } catch (error) {
+    console.error('Re-analyze failed', error);
+    alert('Re-analyze failed: ' + error.message);
+  }
 }

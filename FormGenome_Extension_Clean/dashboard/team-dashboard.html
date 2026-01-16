@@ -249,6 +249,12 @@
     <div class="header">
       <h1>Team Form Genome Dashboard</h1>
       <div class="header-actions">
+        <div id="bulkActions"
+          style="display: none; align-items: center; gap: 10px; margin-right: 10px; padding-right: 10px; border-right: 1px solid #e5e7eb;">
+          <span id="selectedCountDisplay" style="color: #4b5563; font-weight: 500; font-size: 14px;">0 selected</span>
+          <button id="bulkReanalyzeBtn" style="color: #4f46e5; border-color: #4f46e5;">Re-analyze</button>
+          <button id="bulkDeleteBtn" style="color: #dc2626; border-color: #dc2626;">Delete</button>
+        </div>
         <button id="viewMyForms">My Forms Only</button>
         <button id="refreshDashboard">Refresh</button>
         <button id="exportAllCSV">Export CSV</button>

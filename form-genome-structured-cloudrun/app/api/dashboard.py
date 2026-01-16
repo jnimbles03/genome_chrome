@@ -234,6 +234,66 @@ def update_team_form():
         logger.error(f"Failed to update form: {str(e)}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
+
+@dashboard_bp.route('/team/delete', methods=['POST'])
+def delete_team_forms():
+    """Delete forms by ID"""
+    try:
+        data = request.json
+        analysis_ids = data.get('analysis_ids', [])
+        
+        if not analysis_ids:
+            return jsonify({"ok": False, "error": "No IDs provided"}), 400
+            
+        # Convert to integers
+        ids = [int(id) for id in analysis_ids]
+        
+        from app.services.storage import delete_forms
+        count = delete_forms(ids)
+        
+        return jsonify({"ok": True, "deleted_count": count})
+        
+    except Exception as e:
+        logger.error(f"Failed to delete forms: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@dashboard_bp.route('/team/reanalyze', methods=['POST'])
+def reanalyze_team_forms():
+    """Re-analyze forms by ID"""
+    try:
+        data = request.json
+        analysis_ids = data.get('analysis_ids', [])
+        
+        if not analysis_ids:
+            return jsonify({"ok": False, "error": "No IDs provided"}), 400
+            
+        ids = [int(id) for id in analysis_ids]
+        
+        with get_db() as conn:
+            cursor = conn.cursor()
+            format_strings = ','.join(['%s'] * len(ids))
+            cursor.execute(f"SELECT url FROM forms WHERE id IN ({format_strings})", tuple(ids))
+            rows = cursor.fetchall()
+            
+        urls = [row['url'] for row in rows]
+        
+        if not urls:
+             return jsonify({"ok": False, "error": "No valid forms found for re-analysis"}), 404
+
+        from app.services.storage import add_job
+        queued_count = 0
+        for url in urls:
+            # Priority 10 for immediate re-analysis
+            add_job(url, priority=10) 
+            queued_count += 1
+            
+        return jsonify({"ok": True, "queued_count": queued_count})
+        
+    except Exception as e:
+        logger.error(f"Failed to re-analyze forms: {str(e)}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 def register_dashboard_api(app):
     """
     Register dashboard API blueprint with Flask app.

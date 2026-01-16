@@ -67,9 +67,9 @@ def create_app():
     def version():
         """Extension version check endpoint"""
         return {
-            "version": "1.1.0",
+            "version": "1.2.0",
             "min_version": "1.0.0",
-            "message": "Update available! Includes new Dashboard, Entity Consistency fixes, and improved form detection.",
+            "message": "Update available! Includes Admin Dashboard with Bulk Delete/Re-analyze.",
             "download_url": "https://github.com/jnimbles03/genome_chrome/archive/refs/heads/main.zip"
         }
 
