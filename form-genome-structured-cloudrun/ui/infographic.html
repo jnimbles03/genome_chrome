@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Analyzer – Indicators &amp; Complexity Scoring</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.4;
+        }
+        header {
+            background: #2e8540;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        h1 {
+            margin: 0 0 10px;
+            font-size: 28px;
+        }
+        p.subtitle {
+            margin: 0;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h2 {
+            margin-top: 40px;
+            font-size: 22px;
+            border-bottom: 2px solid #2e8540;
+            padding-bottom: 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill,minmax(240px,1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        .card h3 {
+            margin: 0 0 8px;
+            font-size: 16px;
+            color: #2e8540;
+        }
+        .card p {
+            margin: 4px 0;
+            font-size: 14px;
+        }
+        /* Complexity table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+        th {
+            background: #2e8540;
+            color: white;
+        }
+        caption {
+            caption-side: top;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .footnote {
+            font-size: 12px;
+            color: #555;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Form Analyzer Indicators &amp; Complexity Scoring</h1>
+        <p class="subtitle">Understanding the signals we extract from forms and how we score their difficulty</p>
+    </header>
+    <div class="container">
+        <!-- Summary and NIGO formula introduction -->
+        <h2>Overview &amp; Simplified Formulas</h2>
+        <p>This infographic summarises the core signals extracted from forms and explains how two key scores are computed.</p>
+        <ul>
+            <li><strong>Complexity Score</strong>: Measures the structural and cognitive load of a form. Factors include page count, field count, signatures (including witness and notary requirements), attachments, conditional logic, unique signer and third‑party roles, PII collection, drawings and images per page, deadlines and dependencies, and XFA hints. Each factor contributes a weighted number of points, and the sum is capped at 100.  (Domain mismatch weighting is not currently implemented in the scoring logic.)</li>
+            <li><strong>NIGO Risk Score</strong>: Estimates the likelihood that a form will be returned <em>not in good order</em>. It is calculated as 50% of the complexity score plus surcharges for common risk factors: +20 points if attachments are required, +15 points for notarization requirements, and +10 points when conditional logic is present. The total is capped at 100.</li>
+        </ul>
+
+        <h2>Key Indicators &amp; Their Meanings</h2>
+        <details open>
+        <summary style="cursor:pointer; font-weight:bold; margin-bottom:10px">View detailed indicator descriptions</summary>
+        <!-- Indicators grid -->
+        <div class="grid">
+            <div class="card">
+                <h3>Required Fields (REQ‑001)</h3>
+                <p>Identifies fields that should be mandatory (e.g., SSN, DOB, account details) but are marked as optional. Missing required markings raises a high NIGO risk.</p>
+                <p><strong>Severity:</strong> High</p>
+            </div>
+            <div class="card">
+                <h3>Input Masks (FMT‑001)</h3>
+                <p>Detects high‑risk data fields lacking validation (no input mask or formatting checks). This includes SSN, routing or account numbers, and phone numbers.</p>
+                <p><strong>Severity:</strong> Medium</p>
+            </div>
+            <div class="card">
+                <h3>Signature Date Missing (SIG‑002)</h3>
+                <p>Warns when a signature line lacks an adjacent date field. Missing dates can delay processing and trigger follow‑up.</p>
+                <p><strong>Severity:</strong> Low</p>
+            </div>
+            <div class="card">
+                <h3>Conditional Logic Missing (COND‑003)</h3>
+                <p>Marks sections referencing beneficiaries or dependents without visible logic (e.g., JavaScript) to control follow‑on questions. Suggests adding data masks for SSN/DOB.</p>
+                <p><strong>Severity:</strong> Medium</p>
+            </div>
+            <div class="card">
+                <h3>Role Unspecified (ROLE‑001)</h3>
+                <p>Flags signature fields without a labelled role (Applicant, Co‑owner, Notary, etc.). Adding role labels reduces confusion and NIGO risk.</p>
+                <p><strong>Severity:</strong> Medium</p>
+            </div>
+            <div class="card">
+                <h3>Third‑Party Coordination (THRD‑001)</h3>
+                <p>Highlights when additional parties (Physician, Attorney, Financial Advisor, Guardian, etc.) must sign or approve the form. Coordination increases complexity.</p>
+                <p><strong>Severity:</strong> Medium</p>
+            </div>
+            <div class="card">
+                <h3>Attachment Requirements</h3>
+                <p>Looks for text like “attach,” “include copy,” or mentions of supporting documents. Required attachments add to overall complexity and NIGO risk.</p>
+            </div>
+            <div class="card">
+                <h3>Signatures &amp; Notarization</h3>
+                <p>Counts signature fields and identifies witness and notary requirements. Witness signatures and notarization materially increase form difficulty.</p>
+            </div>
+            <div class="card">
+                <h3>JavaScript / Conditional Logic</h3>
+                <p>Detects embedded JavaScript or multistep logic. Complex logic (branching questions, dynamic sections) signals high cognitive load for signers.</p>
+            </div>
+            <div class="card">
+                <h3>Radio Groups</h3>
+                <p>Counts sets of radio buttons. Multiple radio groups indicate branching choices that may confuse signers and increase complexity.</p>
+            </div>
+            <div class="card">
+                <h3>PII Collection</h3>
+                <p>Scans for sensitive personal data (SSN, DOB, TIN, EIN, account and routing numbers, address, email, phone). Each type of PII adds to the complexity score.</p>
+            </div>
+            <div class="card">
+                <h3>Graphics &amp; Layout</h3>
+                <p>Measures drawings and images per page and text density. Many diagrams or busy pages increase cognitive load and the complexity score.</p>
+            </div>
+            <div class="card">
+                <h3>Deadlines &amp; Dependencies</h3>
+                <p>Extracts deadline mentions (“submit within 30 days”) and references to other forms (dependencies). Each deadline or dependency slightly raises complexity.</p>
+            </div>
+            <div class="card">
+                <h3>Domain Mismatch</h3>
+                <p>Checks whether the hosting domain differs from the issuer/brand. Mismatched domains can signal phishing or confusion and add modest complexity.</p>
+            </div>
+        </div>
+        </details>
+
+        <h2>Complexity Score Inputs &amp; Weights</h2>
+        <details open>
+        <summary style="cursor:pointer; font-weight:bold; margin-bottom:10px">View complexity scoring details</summary>
+        <table>
+            <caption>How the overall complexity score is computed (capped at 100)</caption>
+            <thead>
+                <tr><th>Factor</th><th>Weight / Contribution</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Page count</td><td>+2 points per page (max 10)</td></tr>
+                <tr><td>Total fields</td><td>+0.3 points per field (max 15)</td></tr>
+                <tr><td>At least one signature</td><td>+4 points</td></tr>
+                <tr><td>Witness signature</td><td>+10 points</td></tr>
+                <tr><td>Notarized form</td><td>+12 points</td></tr>
+                <tr><td>Mentions “attach”</td><td>+3 points</td></tr>
+                <tr><td>Attachment requirements</td><td>+2 points per item (min 2, max 8)</td></tr>
+                <tr><td>JavaScript present</td><td>+4 points</td></tr>
+                <tr><td>JS with &ge;2 radio groups</td><td>+3 additional points</td></tr>
+                <tr><td>Unique signer roles</td><td>+3 points each (max 18)</td></tr>
+                <tr><td>Third‑party roles</td><td>1 role: +4; 2 roles: +8; 3+: +12. Roles such as Physician, Attorney, or Financial Advisor add +4.</td></tr>
+                <tr><td>PII collected</td><td>SSN &amp; account &amp; routing: +3 each; DOB &amp; TIN &amp; EIN: +2 each; Address/Email/Phone: +1 each</td></tr>
+                <tr><td>Radio groups</td><td>+2 + (#groups) points (max 6)</td></tr>
+                <tr><td>Drawings per page</td><td>&ge;30: +4; 15–29: +3; 5–14: +1</td></tr>
+                <tr><td>Images per page</td><td>&ge;2: +3; 1–1.99: +1</td></tr>
+                <tr><td>XFA hint</td><td>+4 points</td></tr>
+                <tr><td>Deadlines</td><td>At least one mention: +2 points</td></tr>
+                <tr><td>Dependencies</td><td>1 reference: +1; 2+ references: +3</td></tr>
+                <tr><td>Domain mismatch (not currently implemented)</td><td>—</td></tr>
+                <tr><td>Total score</td><td>All contributions summed and capped at 100</td></tr>
+            </tbody>
+        </table>
+        </details>
+        <p class="footnote">Indicators labelled by rule IDs (e.g., REQ‑001) correspond to NIGO checks defined in the Form Analyzer. Severity categories influence NIGO risk but not the complexity score directly.</p>
+        
+        <h2>NIGO Risk Score Formula</h2>
+        <p>The NIGO (Not In Good Order) risk score estimates the likelihood that a submitted form will be returned for corrections.  It is calculated as follows:</p>
+        <ul>
+            <li><strong>Base component:</strong> 50% of the form’s complexity score.</li>
+            <li><strong>Attachments surcharge:</strong> +20 points if the form requires supporting documents or attachments.</li>
+            <li><strong>Notarization surcharge:</strong> +15 points if the form must be notarized or includes notary language.</li>
+            <li><strong>Conditional logic surcharge:</strong> +10 points if the form contains JavaScript or other conditional/branching logic.</li>
+        </ul>
+        <p>The surcharges are added to the base component and the total is capped at 100.  A higher NIGO score indicates a greater risk of a form being rejected or delayed because it is not in good order.</p>
+    </div>
+</body>
+</html>

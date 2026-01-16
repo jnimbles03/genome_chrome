@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Global Genetics Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+/* Reuse the palette from the main dashboard */
+:root{
+  --bg:#06080e;
+  --card:#1f2f46;
+  --card-hover:#253a54;
+  --muted:#131c2a;
+  --text:#e8eef6;
+  --text-secondary:#a1afc4;
+  --accent:#76e0a6;
+  --accent-hover:#5bc88e;
+  --border:#253145;
+  --border-light:#334155;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  color:var(--text);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  overflow-x:hidden;
+  background:var(--bg);
+}
+header{
+  padding:18px 24px;
+  border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg, rgba(6,8,14,.9), rgba(6,8,14,.6), transparent);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+h1{
+  margin:0;
+  font-family:'Space Grotesk',Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  letter-spacing:.2px;
+  font-weight:700;
+}
+a.btn{
+  padding:8px 12px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--muted);
+  color:var(--text);
+  text-decoration:none;
+}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:14px 16px;
+  margin:14px 24px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+}
+/* Table styles */
+#globalTableWrap{
+  overflow-x:auto;
+}
+table.wide{
+  width:auto;
+  /* Increase min-width so columns have more room before horizontal scroll engages */
+  min-width:1600px;
+  border-collapse:collapse;
+  white-space:nowrap;
+}
+table.wide th,table.wide td{
+  padding:8px 6px;
+  border-bottom:1px solid var(--border);
+}
+table.wide thead th{
+  background-color:rgba(255,255,255,0.05);
+}
+table.wide tbody tr:nth-child(odd){
+  background-color:rgba(255,255,255,0.03);
+}
+table.wide tbody tr:hover{
+  background-color:rgba(255,255,255,0.05);
+}
+.icon{
+  font-size:1.1em;
+  line-height:1;
+  vertical-align:middle;
+}
+.icon.yes{color:var(--accent);}
+.icon.no{color:var(--text-secondary);opacity:0.7;}
+.chart-box{
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.4);
+  margin-bottom:16px;
+}
+canvas[id^="gchart"]{
+  background-color:rgba(255,255,255,0.12);
+  border-radius:8px;
+}
+
+/* Summary cards styling */
+.summary-cards{
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px;
+}
+.summary-cards .summary-card{
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 20px;
+  text-align:center;
+  flex:1 1 160px;
+  max-width:200px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+}
+.summary-card .value{
+  display:block;
+  font-size:1.8rem;
+  font-weight:700;
+  color:var(--accent);
+}
+.summary-card .label{
+  display:block;
+  margin-top:4px;
+  font-size:0.9rem;
+  color:var(--text-secondary);
+}
+
+/* Hardest forms table styling */
+#hardestTableWrap table{
+  width:100%;
+  border-collapse:collapse;
+}
+#hardestTableWrap th, #hardestTableWrap td{
+  padding:8px 6px;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+#hardestTableWrap thead th{
+  background-color:rgba(255,255,255,0.05);
+  font-weight:600;
+  font-size:0.9rem;
+}
+#hardestTableWrap tbody tr:nth-child(odd){
+  background-color:rgba(255,255,255,0.03);
+}
+#hardestTableWrap tbody tr:hover{
+  background-color:rgba(255,255,255,0.05);
+}
+.complexity-badge{
+  display:inline-block;
+  padding:2px 6px;
+  border-radius:4px;
+  font-weight:600;
+  color:#0e121a;
+  font-size:0.8rem;
+}
+.priority-dot{
+  display:inline-block;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  margin-right:6px;
+}
+</style>
+<!-- Load Chart.js library for rendering charts on the Global Genetics page -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<canvas id="orbCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;pointer-events:none;"></canvas>
+<header>
+  <h1>Global Genetics</h1>
+  <div>
+    <a class="btn" href="/">Dashboard</a>
+  </div>
+</header>
+<main>
+  <!-- Summary section similar to the report template -->
+  <section class="card" id="summaryCard">
+    <h2>Summary Insights</h2>
+    <div id="summaryCards" class="summary-cards" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:flex-start;"></div>
+  </section>
+  <!-- Overview charts section -->
+  <section class="card" id="overviewCard">
+    <h2>Overview Charts</h2>
+    <div id="overviewCharts" style="display:flex;flex-wrap:wrap;gap:16px;"></div>
+  </section>
+  <!-- Hardest forms section -->
+  <section class="card" id="hardestCard">
+    <h2>Hardest Forms</h2>
+    <div id="hardestTableWrap"></div>
+  </section>
+  <!-- All forms table -->
+  <section class="card" id="allFormsCard">
+    <h2>All Forms</h2>
+    <div id="globalTableWrap"></div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="password" id="adminPin" placeholder="Admin PIN" style="background:var(--muted);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;" />
+      <button id="deleteRecordsBtn" type="button" style="background:var(--accent);color:#0a0a0a;border:none;padding:10px 12px;border-radius:10px;font-weight:600;cursor:pointer;">Delete All Records</button>
+    </div>
+  </section>
+</main>
+<script>
+"use strict";
+// Orb animation copied from the main page
+(function(){
+  const canvas=document.getElementById('orbCanvas');
+  const ctx=canvas.getContext('2d');
+  const orbs=[];
+  const orbCount=30;
+  const colors=[varOrbsColour()];
+  function varOrbsColour(){return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#76e0a6';}
+  for(let i=0;i<orbCount;i++){
+    const x=Math.random()*canvas.width;
+    const y=Math.random()*canvas.height;
+    const size=1+Math.random()*3;
+    const dx=(Math.random()-0.5)*0.5;
+    const dy=(Math.random()-0.5)*0.5;
+    orbs.push({x,y,size,dx,dy});
+  }
+  function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+  window.addEventListener('resize',resize);
+  resize();
+  function animate(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(const o of orbs){
+      o.x+=o.dx;
+      o.y+=o.dy;
+      if(o.x<0||o.x>canvas.width) o.dx*=-1;
+      if(o.y<0||o.y>canvas.height) o.dy*=-1;
+      const grad=ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.size*10);
+      grad.addColorStop(0, colors[0]);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle=grad;
+      ctx.fillRect(o.x-o.size*10,o.y-o.size*10,o.size*20,o.size*20);
+    }
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+// Helper to fetch JSON
+async function getJSON(u,o){ const r=await fetch(u,o||{}); const t=await r.text(); if(!r.ok) throw new Error(t||r.statusText); try{return JSON.parse(t);}catch{throw new Error('Non-JSON');} }
+// Column definitions (reuse same as dashboard but filtered)
+// Column definitions for the global genetics table.  The widest fields
+// (key_drivers and special_requirements) are appended to the end so they
+// don't squeeze the rest of the columns.  Document type and subtype
+// have been removed for brevity.
+const allCols = [
+  "form_name",
+  "entity_name",
+  "industry_vertical",
+  "industry_subvertical",
+  "source_url",
+  "pages",
+  "attachment_count",
+  "field_count",
+  "text_fields",
+  "checkboxes",
+  "dropdowns",
+  "signature_count",
+  "witness_signature_count",
+  "conditional_signature_count",
+  "data_validation_count",
+  "notarization_required",
+  "attachments_required",
+  "conditional_logic",
+  "deadlines_present",
+  "form_dependencies",
+  "third_party_involved",
+  "identification_required",
+  "click_to_agree",
+  "same_domain",
+  "witnesses_required",
+  "language_count",
+  "estimated_signer_time",
+  "estimated_processing_time",
+  "complexity_score",
+  "nigo_score",
+  "timestamp",
+  // Wide columns appended last
+  "key_drivers",
+  "special_requirements",
+  "status"
+];
+// Function to render table
+function renderTable(rows){
+  const boolCols=['notarization_required','attachments_required','conditional_logic','deadlines_present','form_dependencies','third_party_involved','identification_required','click_to_agree','same_domain','witnesses_required'];
+  let html="<table class='wide'><thead><tr>"+allCols.map(c=>{
+    const lbl=c.replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase());
+    return "<th>"+lbl+"</th>";
+  }).join('')+"</tr></thead><tbody>";
+  rows.forEach(function(r){
+    html+='<tr>'+allCols.map(function(c){
+      // Link for source_url
+      if(c==='source_url'){
+        const u=r.url||r.source_url||'';
+        return '<td>'+ (u ? "<a href='"+u+"' target='_blank' rel='noopener'>View</a>" : '') + '</td>';
+      }
+      // Signature fields
+      if(c==='signature_count') return '<td>'+((r.signature_analysis&&r.signature_analysis.signature_count)||0)+'</td>';
+      if(c==='witness_signature_count') return '<td>'+((r.signature_analysis&&r.signature_analysis.witness_signature_count)||0)+'</td>';
+      if(c==='conditional_signature_count') return '<td>'+((r.signature_analysis&&r.signature_analysis.conditional_signature_count)||0)+'</td>';
+      // Pages
+      if(c==='pages'){
+        const p=r.pages||r.page_count||'';
+        return '<td>'+p+'</td>';
+      }
+      // Numeric defaults
+      if(['attachment_count','field_count','text_fields','checkboxes','dropdowns','data_validation_count','language_count','estimated_signer_time','estimated_processing_time'].includes(c)){
+        return '<td>'+(r[c]!=null?r[c]:0)+'</td>';
+      }
+      // Arrays
+      if(c==='key_drivers'||c==='special_requirements'){
+        const arr=r[c]||[];
+        return '<td>'+(Array.isArray(arr)?arr.join(', '):'')+'</td>';
+      }
+      // Booleans
+      if(boolCols.includes(c)){
+        const v=r[c];
+        const isYes=(v===true||v==='Yes'||v==='yes'||v==='Y'||v==='True'||v==='true');
+        return '<td>'+(isYes?"<span class='icon yes'>&#x2714;</span>":"<span class='icon no'>&#x274C;</span>")+'</td>';
+      }
+      let val=r[c];
+      if(val===undefined||val===null) val='';
+      if(typeof val==='object'){
+        try{val=JSON.stringify(val);}catch{val='';}
+      }
+      return '<td>'+String(val)+'</td>';
+    }).join('')+'</tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('globalTableWrap').innerHTML=html;
+}
+
+// Render summary insights cards
+function renderSummaryCards(rows){
+  const container=document.getElementById('summaryCards');
+  if(!container) return;
+  const total=rows.length;
+  if(total===0){ container.innerHTML=''; return; }
+  // Compute metrics
+  let totalComplexity=0, attachmentsYes=0, conditionalYes=0, notarizationYes=0;
+  rows.forEach(r=>{
+    const cs=parseFloat(r.complexity_score||0); if(!isNaN(cs)) totalComplexity+=cs;
+    const att=r.attachments_required; if(att===true||att==='Yes'||att==='yes'||att==='Y'||att==='True'||att==='true') attachmentsYes++;
+    const cond=r.conditional_logic; if(cond===true||cond==='Yes'||cond==='yes'||cond==='Y'||cond==='True'||cond==='true') conditionalYes++;
+    const not=r.notarization_required; if(not===true||not==='Yes'||not==='yes'||not==='Y'||not==='True'||not==='true') notarizationYes++;
+  });
+  const avgComplexity=total>0? (totalComplexity/total) : 0;
+  // Build card definitions
+  const cards=[
+    {value:total.toString(),label:'Total Forms'},
+    {value:avgComplexity.toFixed(1),label:'Avg Complexity'},
+    {value:`${attachmentsYes} (${((attachmentsYes/total)*100).toFixed(1)}%)`,label:'Attachments'},
+    {value:`${conditionalYes} (${((conditionalYes/total)*100).toFixed(1)}%)`,label:'Conditional Logic'},
+    {value:`${notarizationYes} (${((notarizationYes/total)*100).toFixed(1)}%)`,label:'Notarization'}
+  ];
+  container.innerHTML='';
+  cards.forEach(function(card){
+    const div=document.createElement('div');
+    div.className='summary-card';
+    const val=document.createElement('span'); val.className='value'; val.textContent=card.value;
+    const lbl=document.createElement('span'); lbl.className='label'; lbl.textContent=card.label;
+    div.appendChild(val);
+    div.appendChild(lbl);
+    container.appendChild(div);
+  });
+}
+
+// Render hardest forms table (top 5 by complexity)
+function renderHardestForms(rows){
+  const container=document.getElementById('hardestTableWrap');
+  if(!container) return;
+  if(!rows||rows.length===0){ container.innerHTML=''; return; }
+  // Sort by complexity descending
+  const sorted=[...rows].sort((a,b)=>parseFloat(b.complexity_score||0)-parseFloat(a.complexity_score||0));
+  const top=sorted.slice(0,5);
+  let html="<table><thead><tr><th>Form Title</th><th>Complexity</th><th>Pages</th><th>Issues</th><th>Priority</th></tr></thead><tbody>";
+  top.forEach(r=>{
+    const formName=r.form_name||'';
+    const comp=parseFloat(r.complexity_score||0);
+    const pages=r.pages||r.page_count||'';
+    // Determine issues
+    const issues=[];
+    if(pages>6) issues.push('High page count');
+    const att=r.attachments_required; if(att===true||att==='Yes'||att==='yes'||att==='Y'||att==='True'||att==='true') issues.push('Attachments required');
+    const cond=r.conditional_logic; if(cond===true||cond==='Yes'||cond==='yes'||cond==='Y'||cond==='True'||cond==='true') issues.push('Conditional logic');
+    if(issues.length===0) issues.push('None identified');
+    // Determine priority and colour
+    let priority='Low'; let color='var(--accent)'; let badgeColor='rgba(118,224,166,0.8)';
+    if(comp>=60){ priority='Critical'; color='#cf5b74'; badgeColor='rgba(207,91,116,0.8)'; }
+    else if(comp>=40){ priority='Medium'; color='#e3a44d'; badgeColor='rgba(227,164,77,0.8)'; }
+    // Complexity badge colour
+    let compBg=badgeColor;
+    html+='<tr>';
+    html+='<td>'+formName+'</td>';
+    html+='<td><span class="complexity-badge" style="background:'+compBg+'">'+comp.toFixed(1)+'</span></td>';
+    html+='<td>'+pages+'</td>';
+    html+='<td>'+issues.join(', ')+'</td>';
+    html+='<td><span class="priority-dot" style="background:'+color+';"></span>'+priority+'</td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  container.innerHTML=html;
+}
+// Setup chart selects
+function setupChartSelects(){
+  const fields=[
+    {value:'notarization_required',label:'Notarization Required'},
+    {value:'attachments_required',label:'Attachments Required'},
+    {value:'conditional_logic',label:'Conditional Logic'},
+    {value:'pages',label:'Pages'},
+    {value:'complexity_score',label:'Complexity Score'},
+    {value:'nigo_score',label:'NIGO Score'}
+  ];
+  const selects=[document.getElementById('gchart1Select'),document.getElementById('gchart2Select'),document.getElementById('gchart3Select')];
+  selects.forEach(function(sel){
+    if(!sel) return;
+    sel.innerHTML='';
+    fields.forEach(function(f){
+      const opt=document.createElement('option');
+      opt.value=f.value;opt.textContent=f.label;
+      sel.appendChild(opt);
+    });
+  });
+  if(selects[0]) selects[0].value='notarization_required';
+  if(selects[1]) selects[1].value='attachments_required';
+  if(selects[2]) selects[2].value='conditional_logic';
+  selects.forEach(function(sel){
+    if(!sel) return;
+    sel.addEventListener('change',function(){ if(window._globalRows) updateGlobalCharts(window._globalRows); });
+  });
+}
+// Chart update for global page
+function updateGlobalCharts(rows){
+  // Prepare fixed chart definitions similar to the report template
+  const container=document.getElementById('overviewCharts');
+  if(!rows||rows.length===0){
+    container.innerHTML='';
+    return;
+  }
+  // Compute distributions
+  const yesNoDistribution=(attr)=>{
+    let yesCount=0; let noCount=0;
+    rows.forEach(r=>{
+      const v=r[attr];
+      const yes=(v===true||v==='Yes'||v==='yes'||v==='Y'||v==='True'||v==='true');
+      if(yes) yesCount++; else noCount++;
+    });
+    return {labels:['Yes','No'],counts:[yesCount,noCount]};
+  };
+  const compDist=()=>{
+    const bins={'0-19':0,'20-39':0,'40-59':0,'60-79':0,'80-100':0};
+    rows.forEach(r=>{
+      const cs=parseFloat(r.complexity_score||0);
+      if(cs<20) bins['0-19']++; else if(cs<40) bins['20-39']++; else if(cs<60) bins['40-59']++; else if(cs<80) bins['60-79']++; else bins['80-100']++;
+    });
+    return {labels:Object.keys(bins),counts:Object.values(bins)};
+  };
+  // Definitions for each chart: attr for yes/no or 'complexity'
+  const defs=[
+    {attr:'notarization_required',label:'Notarization Required',colors:['#e35a5a','#76e0a6'],legend:['Yes','No']},
+    {attr:'attachments_required',label:'Attachments Required',colors:['#f6c963','#76e0a6'],legend:['Yes','No']},
+    {attr:'conditional_logic',label:'Conditional Logic',colors:['#76e0a6','#e35a5a'],legend:['Yes','No']},
+    {attr:'complexity',label:'Complexity Distribution',colors:['#4a8fc1','#78add2','#a6cbe3','#cce4f6','#eef6fb'],legend:['0-19','20-39','40-59','60-79','80-100']}
+  ];
+  // Clear previous charts and container
+  container.innerHTML='';
+  window._overviewCharts = window._overviewCharts || [];
+  // Chart plugin for drawing labels inside arcs
+  const donutLabels={id:'donutLabels',afterDraw:function(chart){
+    const ctx=chart.ctx;
+    const ds=chart.data.datasets[0];
+    const total=ds.data.reduce((a,b)=>a+b,0);
+    chart.getDatasetMeta(0).data.forEach(function(arc,index){
+      const val=ds.data[index];
+      if(!val) return;
+      const percent=total?Math.round((val/total)*100):0;
+      const label=chart.data.labels[index];
+      const text=label+', '+percent+'%';
+      const pos=arc.tooltipPosition();
+      ctx.save();
+      ctx.fillStyle='#0e121a';
+      ctx.font='14px Inter, sans-serif';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(text,pos.x,pos.y);
+      ctx.restore();
+    });
+  }};
+  defs.forEach(function(def,i){
+    const box=document.createElement('div');
+    box.className='chart-box';
+    box.style.flex='1 1 300px';
+    box.style.maxWidth='380px';
+    const h=document.createElement('h3');
+    h.textContent=def.label;
+    box.appendChild(h);
+    const canvas=document.createElement('canvas');
+    canvas.id='overviewChart'+i;
+    // Ensure the canvas fills the available width of its container and has a fixed
+    // height so the gauge maintains its aspect ratio.  Without setting width,
+    // Chart.js will compute it based on the container when responsive mode is on.
+    canvas.style.width='100%';
+    canvas.style.height='160px';
+    box.appendChild(canvas);
+    // Legend
+    const legendDiv=document.createElement('div');
+    legendDiv.style.display='flex';
+    legendDiv.style.gap='8px';
+    legendDiv.style.marginTop='8px';
+    def.legend.forEach(function(lbl,j){
+      const item=document.createElement('div');
+      item.style.display='flex'; item.style.alignItems='center'; item.style.gap='4px';
+      const swatch=document.createElement('span');
+      swatch.style.display='inline-block';
+      swatch.style.width='14px';
+      swatch.style.height='6px';
+      swatch.style.backgroundColor=def.colors[j];
+      swatch.style.borderRadius='3px';
+      const textSpan=document.createElement('span');
+      textSpan.style.fontSize='0.8rem';
+      textSpan.textContent=lbl;
+      item.appendChild(swatch);
+      item.appendChild(textSpan);
+      legendDiv.appendChild(item);
+    });
+    box.appendChild(legendDiv);
+    container.appendChild(box);
+    // Prepare data
+    let dist;
+    if(def.attr==='complexity'){
+      dist=compDist();
+    } else {
+      dist=yesNoDistribution(def.attr);
+    }
+    // Chart options (semi-circle for gauge)
+    // Chart options: enable responsiveness and disable animation.  Avoid setting
+    // explicit width/height so Chart.js measures based on the container.  A
+    // semi‑circular gauge effect is achieved via rotation and circumference.
+    const opts={
+      responsive:true,
+      maintainAspectRatio:false,
+      rotation:-Math.PI,
+      circumference:Math.PI,
+      cutout:'70%',
+      animation:false,
+      plugins:{legend:{display:false},tooltip:{enabled:true}}
+    };
+    // Create the chart after the element has been laid out.  Using
+    // requestAnimationFrame ensures that the container has a computed width
+    // before Chart.js measures it, preventing the chart from collapsing to a
+    // thin bar.  Destroy any previous chart instance.
+    requestAnimationFrame(() => {
+      if(window._overviewCharts[i]){
+        try{window._overviewCharts[i].destroy();}catch(e){}
+      }
+      const ctx=canvas.getContext('2d');
+      window._overviewCharts[i]=new Chart(ctx,{type:'doughnut',data:{labels:def.legend,datasets:[{data:dist.counts,backgroundColor:def.colors,borderColor:'rgba(0,0,0,0.2)',borderWidth:1}]},options:opts,plugins:[donutLabels]});
+    });
+  });
+}
+// Load records on page load
+async function loadGlobal(){
+  try{
+    const records=await getJSON('/api/records_unique');
+    // Render table, summary, charts and hardest forms
+    renderTable(records);
+    renderSummaryCards(records);
+    updateGlobalCharts(records);
+    renderHardestForms(records);
+  }catch(e){console.error(e);}
+}
+// Handle deletion
+document.addEventListener('DOMContentLoaded',function(){
+  loadGlobal();
+  document.getElementById('deleteRecordsBtn').addEventListener('click',async function(){
+    const pin=document.getElementById('adminPin').value||'';
+    if(!pin){ alert('Enter the admin PIN'); return; }
+    try{
+      const resp=await fetch('/api/delete_records',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
+      const res=await resp.json();
+      if(res.ok){ alert('All records deleted'); loadGlobal(); } else { alert(res.msg||'Deletion failed'); }
+    }catch(err){ alert('Error deleting records'); }
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Form Genome - Web Crawler</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+      min-height: 100vh;
+      padding: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Parallax Pixel Stars */
+    #stars, #stars2, #stars3 {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      background: transparent;
+      pointer-events: none;
+    }
+
+    #stars {
+      box-shadow: 779px 1331px #FFF, 324px 42px #FFF, 303px 586px #FFF, 1286px 1058px #FFF, 1100px 1131px #FFF,
+                  147px 1128px #FFF, 861px 1003px #FFF, 1559px 1991px #FFF, 1166px 1804px #FFF, 1676px 1240px #FFF,
+                  1912px 1768px #FFF, 1167px 1958px #FFF, 1258px 1524px #FFF, 1624px 1617px #FFF, 1419px 1634px #FFF,
+                  217px 1750px #FFF, 1540px 1683px #FFF, 1139px 1803px #FFF, 1815px 1883px #FFF, 1703px 1713px #FFF,
+                  1870px 1665px #FFF, 680px 1997px #FFF, 1541px 1939px #FFF, 1278px 1948px #FFF, 1970px 1364px #FFF,
+                  1800px 1165px #FFF, 1072px 1434px #FFF, 1888px 1668px #FFF, 1945px 1745px #FFF, 1980px 1748px #FFF;
+      animation: animStar 50s linear infinite;
+    }
+
+    #stars:after {
+      content: " ";
+      position: fixed;
+      top: 2000px;
+      width: 1px;
+      height: 1px;
+      background: transparent;
+      box-shadow: 779px 1331px #FFF, 324px 42px #FFF, 303px 586px #FFF, 1286px 1058px #FFF, 1100px 1131px #FFF,
+                  147px 1128px #FFF, 861px 1003px #FFF, 1559px 1991px #FFF, 1166px 1804px #FFF, 1676px 1240px #FFF,
+                  1912px 1768px #FFF, 1167px 1958px #FFF, 1258px 1524px #FFF, 1624px 1617px #FFF, 1419px 1634px #FFF,
+                  217px 1750px #FFF, 1540px 1683px #FFF, 1139px 1803px #FFF, 1815px 1883px #FFF, 1703px 1713px #FFF,
+                  1870px 1665px #FFF, 680px 1997px #FFF, 1541px 1939px #FFF, 1278px 1948px #FFF, 1970px 1364px #FFF,
+                  1800px 1165px #FFF, 1072px 1434px #FFF, 1888px 1668px #FFF, 1945px 1745px #FFF, 1980px 1748px #FFF;
+    }
+
+    #stars2 {
+      box-shadow: 1446px 320px #FFF, 1713px 1567px #FFF, 1155px 746px #FFF, 1325px 853px #FFF, 1527px 676px #FFF,
+                  1645px 545px #FFF, 1006px 1200px #FFF, 1677px 1188px #FFF, 1125px 1501px #FFF, 1646px 695px #FFF,
+                  1157px 1390px #FFF, 1408px 1043px #FFF, 1688px 1447px #FFF, 1505px 872px #FFF, 1869px 1491px #FFF;
+      animation: animStar 100s linear infinite;
+    }
+
+    #stars2:after {
+      content: " ";
+      position: fixed;
+      top: 2000px;
+      width: 1px;
+      height: 1px;
+      background: transparent;
+      box-shadow: 1446px 320px #FFF, 1713px 1567px #FFF, 1155px 746px #FFF, 1325px 853px #FFF, 1527px 676px #FFF,
+                  1645px 545px #FFF, 1006px 1200px #FFF, 1677px 1188px #FFF, 1125px 1501px #FFF, 1646px 695px #FFF,
+                  1157px 1390px #FFF, 1408px 1043px #FFF, 1688px 1447px #FFF, 1505px 872px #FFF, 1869px 1491px #FFF;
+    }
+
+    #stars3 {
+      box-shadow: 571px 173px #FFF, 1732px 143px #FFF, 1745px 454px #FFF, 234px 784px #FFF, 1793px 1123px #FFF,
+                  1076px 504px #FFF, 633px 601px #FFF, 350px 630px #FFF, 1164px 782px #FFF, 76px 690px #FFF;
+      animation: animStar 150s linear infinite;
+    }
+
+    #stars3:after {
+      content: " ";
+      position: fixed;
+      top: 2000px;
+      width: 1px;
+      height: 1px;
+      background: transparent;
+      box-shadow: 571px 173px #FFF, 1732px 143px #FFF, 1745px 454px #FFF, 234px 784px #FFF, 1793px 1123px #FFF,
+                  1076px 504px #FFF, 633px 601px #FFF, 350px 630px #FFF, 1164px 782px #FFF, 76px 690px #FFF;
+    }
+
+    @keyframes animStar {
+      from {
+        transform: translateY(0px);
+      }
+      to {
+        transform: translateY(-2000px);
+      }
+    }
+
+    /* Main container */
+    .container {
+      max-width: 800px;
+      margin: 100px auto 0;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .title-container {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      margin-bottom: 40px;
+      gap: 20px;
+    }
+
+    .title-text {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: flex-start;
+      text-align: left;
+      height: 80px;
+    }
+
+    h1 {
+      color: white;
+      font-size: 3em;
+      margin: 0;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+      line-height: 1;
+    }
+
+    /* DNA Helix Container */
+    .dna-helix {
+      width: 60px;
+      height: 80px;
+      position: relative;
+      margin-right: 20px;
+      animation: dnaFloat 3s ease-in-out infinite;
+    }
+
+    @keyframes dnaFloat {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-5px); }
+    }
+
+    /* DNA Base Pairs */
+    .dna-dot {
+      position: absolute;
+      width: 100%;
+      height: 3px;
+      left: 0;
+      background: linear-gradient(90deg, transparent, rgba(100, 181, 246, 0.3), transparent);
+    }
+
+    .dna-dot::before,
+    .dna-dot::after {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      top: 50%;
+      margin-top: -4px;
+    }
+
+    .dna-dot::before {
+      background: radial-gradient(circle, #64b5f6, #42a5f5);
+      box-shadow: 0 0 10px rgba(66, 165, 245, 0.8);
+      animation: orbit1 3s linear infinite;
+    }
+
+    .dna-dot::after {
+      background: radial-gradient(circle, #f48fb1, #ec407a);
+      box-shadow: 0 0 10px rgba(236, 64, 122, 0.8);
+      animation: orbit2 3s linear infinite;
+    }
+
+    /* Position each base pair vertically */
+    .dna-dot:nth-child(1) { top: 5%; }
+    .dna-dot:nth-child(2) { top: 20%; }
+    .dna-dot:nth-child(3) { top: 35%; }
+    .dna-dot:nth-child(4) { top: 50%; }
+    .dna-dot:nth-child(5) { top: 65%; }
+    .dna-dot:nth-child(6) { top: 80%; }
+    .dna-dot:nth-child(7) { top: 95%; }
+
+    /* Delay each pair's animation to create spiral */
+    .dna-dot:nth-child(2)::before,
+    .dna-dot:nth-child(2)::after { animation-delay: -0.43s; }
+    .dna-dot:nth-child(3)::before,
+    .dna-dot:nth-child(3)::after { animation-delay: -0.86s; }
+    .dna-dot:nth-child(4)::before,
+    .dna-dot:nth-child(4)::after { animation-delay: -1.29s; }
+    .dna-dot:nth-child(5)::before,
+    .dna-dot:nth-child(5)::after { animation-delay: -1.72s; }
+    .dna-dot:nth-child(6)::before,
+    .dna-dot:nth-child(6)::after { animation-delay: -2.15s; }
+    .dna-dot:nth-child(7)::before,
+    .dna-dot:nth-child(7)::after { animation-delay: -2.58s; }
+
+    /* Blue strand orbits clockwise */
+    @keyframes orbit1 {
+      0% {
+        left: 50%;
+        transform: translateX(-50%) translateX(25px) scale(1.2);
+        z-index: 2;
+      }
+      25% {
+        left: 50%;
+        transform: translateX(-50%) translateX(0px) scale(0.7);
+        z-index: 1;
+      }
+      50% {
+        left: 50%;
+        transform: translateX(-50%) translateX(-25px) scale(1.2);
+        z-index: 2;
+      }
+      75% {
+        left: 50%;
+        transform: translateX(-50%) translateX(0px) scale(0.7);
+        z-index: 1;
+      }
+      100% {
+        left: 50%;
+        transform: translateX(-50%) translateX(25px) scale(1.2);
+        z-index: 2;
+      }
+    }
+
+    /* Pink strand orbits counter-clockwise */
+    @keyframes orbit2 {
+      0% {
+        left: 50%;
+        transform: translateX(-50%) translateX(-25px) scale(1.2);
+        z-index: 2;
+      }
+      25% {
+        left: 50%;
+        transform: translateX(-50%) translateX(0px) scale(0.7);
+        z-index: 1;
+      }
+      50% {
+        left: 50%;
+        transform: translateX(-50%) translateX(25px) scale(1.2);
+        z-index: 2;
+      }
+      75% {
+        left: 50%;
+        transform: translateX(-50%) translateX(0px) scale(0.7);
+        z-index: 1;
+      }
+      100% {
+        left: 50%;
+        transform: translateX(-50%) translateX(-25px) scale(1.2);
+        z-index: 2;
+      }
+    }
+
+    .subtitle {
+      color: rgba(255,255,255,0.9);
+      font-size: 1.2em;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    /* Action Section */
+    .action-section {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      margin-bottom: 30px;
+    }
+
+    .action-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #666;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .tab-button:hover {
+      background: #e8e8e8;
+    }
+
+    .tab-button.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="url"] {
+      flex: 1;
+      padding: 14px 18px;
+      font-size: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="url"]:focus {
+      border-color: #667eea;
+    }
+
+    button {
+      padding: 14px 30px;
+      font-size: 15px;
+      font-weight: 600;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .upload-drop-zone {
+      padding: 40px;
+      border: 2px dashed #d0d0d0;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-drop-zone:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    .upload-text {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .upload-text strong {
+      color: #667eea;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    /* Progress Section */
+    .progress-section {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      margin-top: 20px;
+      display: none;
+    }
+
+    .progress-section.active {
+      display: block;
+    }
+
+    .status {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Results Section */
+    .results {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      margin-top: 20px;
+      display: none;
+      text-align: left;
+    }
+
+    .results.active {
+      display: block;
+    }
+
+    .results h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+
+    .form-item {
+      padding: 15px;
+      background: #f8f9ff;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      border-left: 4px solid #667eea;
+    }
+
+    .form-title {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 5px;
+    }
+
+    .form-url {
+      font-size: 0.9em;
+      color: #666;
+      word-break: break-all;
+    }
+
+    .error {
+      background: #fff0f0;
+      border-left-color: #ff4444;
+    }
+
+    .error .form-title {
+      color: #ff4444;
+    }
+  </style>
+</head>
+<body>
+  <!-- Parallax Stars Background -->
+  <div id="stars"></div>
+  <div id="stars2"></div>
+  <div id="stars3"></div>
+
+  <input type="file" id="fileInput" accept=".pdf" multiple>
+
+  <!-- Main Container -->
+  <div class="container">
+    <div class="title-container">
+      <div class="dna-helix">
+        <div class="dna-dot"></div>
+        <div class="dna-dot"></div>
+        <div class="dna-dot"></div>
+        <div class="dna-dot"></div>
+        <div class="dna-dot"></div>
+        <div class="dna-dot"></div>
+        <div class="dna-dot"></div>
+      </div>
+      <div class="title-text">
+        <h1>Form Genome</h1>
+        <p class="subtitle">Discover and analyze forms across the web</p>
+      </div>
+    </div>
+
+    <!-- Action Section -->
+    <div class="action-section">
+      <!-- Tabs -->
+      <div class="action-tabs">
+        <button class="tab-button active" onclick="switchTab('scan')">
+          🔍 Scan Website
+        </button>
+        <button class="tab-button" onclick="switchTab('upload')">
+          📎 Upload PDFs
+        </button>
+      </div>
+
+      <!-- Scan Tab -->
+      <div id="scanTab" class="tab-content active">
+        <div class="input-group">
+          <input
+            type="url"
+            id="urlInput"
+            placeholder="Enter website URL..."
+            value="https://registrar.unm.edu/forms/index.html"
+          >
+          <button id="crawlButton" onclick="startCrawl()">Scan</button>
+        </div>
+      </div>
+
+      <!-- Upload Tab -->
+      <div id="uploadTab" class="tab-content">
+        <div class="upload-drop-zone" onclick="document.getElementById('fileInput').click()">
+          <div class="upload-icon">📎</div>
+          <div class="upload-text">
+            <strong>Click to upload</strong> or drag and drop<br>
+            PDF files (multiple files supported)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="progress-section" id="progressSection">
+      <div class="status" id="statusText">
+        <span class="loading"></span>
+        Scanning website for forms...
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="results" id="resultsSection">
+      <h2>📋 Discovered Forms</h2>
+      <div id="formsList"></div>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tab) {
+      const tabs = document.querySelectorAll('.tab-button');
+      const contents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach(t => t.classList.remove('active'));
+      contents.forEach(c => c.classList.remove('active'));
+
+      if (tab === 'scan') {
+        tabs[0].classList.add('active');
+        document.getElementById('scanTab').classList.add('active');
+      } else {
+        tabs[1].classList.add('active');
+        document.getElementById('uploadTab').classList.add('active');
+      }
+    }
+
+    // File upload handler
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+      const files = e.target.files;
+      if (files.length === 0) return;
+
+      const progressSection = document.getElementById('progressSection');
+      const statusText = document.getElementById('statusText');
+      const resultsSection = document.getElementById('resultsSection');
+      const formsList = document.getElementById('formsList');
+
+      progressSection.classList.add('active');
+      resultsSection.classList.remove('active');
+      statusText.innerHTML = `<span class="loading"></span>Analyzing ${files.length} PDF${files.length > 1 ? 's' : ''}...`;
+
+      formsList.innerHTML = '';
+
+      // Upload each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+          const response = await fetch('/api/analyze/upload', {
+            method: 'POST',
+            body: formData
+          });
+
+          const result = await response.json();
+
+          const formItem = document.createElement('div');
+          formItem.className = 'form-item';
+          formItem.innerHTML = `
+            <div class="form-title">${result.title || file.name}</div>
+            <div class="form-url">Entity: ${result.entity || 'Unknown'}</div>
+            <div class="form-url">File: ${file.name} (${(file.size / 1024).toFixed(1)} KB)</div>
+          `;
+          formsList.appendChild(formItem);
+        } catch (error) {
+          const formItem = document.createElement('div');
+          formItem.className = 'form-item error';
+          formItem.innerHTML = `
+            <div class="form-title">❌ Error analyzing ${file.name}</div>
+            <div class="form-url">${error.message}</div>
+          `;
+          formsList.appendChild(formItem);
+        }
+      }
+
+      progressSection.classList.remove('active');
+      resultsSection.classList.add('active');
+      e.target.value = ''; // Reset file input
+    });
+
+    // Crawl function
+    async function startCrawl() {
+      const urlInput = document.getElementById('urlInput');
+      const crawlButton = document.getElementById('crawlButton');
+      const progressSection = document.getElementById('progressSection');
+      const resultsSection = document.getElementById('resultsSection');
+      const formsList = document.getElementById('formsList');
+      const statusText = document.getElementById('statusText');
+
+      const url = urlInput.value.trim();
+      if (!url) {
+        alert('Please enter a URL');
+        return;
+      }
+
+      // Show progress
+      crawlButton.disabled = true;
+      progressSection.classList.add('active');
+      resultsSection.classList.remove('active');
+      statusText.innerHTML = '<span class="loading"></span>Scanning website for forms...';
+      formsList.innerHTML = '';
+
+      try {
+        // Create batch job
+        const createResponse = await fetch('/api/batch/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            url: url,
+            max_forms: 5000,
+            name: `Scan of ${new URL(url).hostname}`
+          })
+        });
+
+        if (!createResponse.ok) {
+          throw new Error(`Failed to create batch: ${createResponse.statusText}`);
+        }
+
+        const batch = await createResponse.json();
+        const batchId = batch.batch_id;
+
+        // Poll for results
+        let attempts = 0;
+        const maxAttempts = 120; // 2 minutes max
+
+        const checkStatus = async () => {
+          attempts++;
+
+          const statusResponse = await fetch(`/api/batch/status/${batchId}`);
+          const status = await statusResponse.json();
+
+          if (status.status === 'completed') {
+            // Show results
+            progressSection.classList.remove('active');
+            resultsSection.classList.add('active');
+
+            if (status.forms && status.forms.length > 0) {
+              formsList.innerHTML = '';
+              status.forms.forEach(form => {
+                const formItem = document.createElement('div');
+                formItem.className = 'form-item';
+                formItem.innerHTML = `
+                  <div class="form-title">${form.title || 'Untitled Form'}</div>
+                  <div class="form-url">${form.url}</div>
+                `;
+                formsList.appendChild(formItem);
+              });
+            } else {
+              formsList.innerHTML = '<div class="form-item">No forms found on this website.</div>';
+            }
+
+            crawlButton.disabled = false;
+          } else if (status.status === 'failed') {
+            throw new Error(status.error || 'Batch processing failed');
+          } else if (attempts < maxAttempts) {
+            // Still processing, check again
+            statusText.innerHTML = `<span class="loading"></span>Found ${status.discovered || 0} forms so far...`;
+            setTimeout(checkStatus, 1000);
+          } else {
+            throw new Error('Timeout waiting for results');
+          }
+        };
+
+        setTimeout(checkStatus, 2000);
+
+      } catch (error) {
+        progressSection.classList.remove('active');
+        resultsSection.classList.add('active');
+        formsList.innerHTML = `
+          <div class="form-item error">
+            <div class="form-title">❌ Error</div>
+            <div class="form-url">${error.message}</div>
+          </div>
+        `;
+        crawlButton.disabled = false;
+      }
+    }
+
+    // Allow Enter key to start crawl
+    document.getElementById('urlInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        startCrawl();
+      }
+    });
+  </script>
+</body>
+</html>

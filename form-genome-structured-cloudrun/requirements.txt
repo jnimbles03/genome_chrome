@@ -1,0 +1,43 @@
+# Core Dependencies
+Flask==3.0.0
+flask-cors==4.0.0
+gunicorn==21.2.0
+requests==2.31.0
+certifi==2023.11.17
+
+# PDF Processing
+pypdf==3.17.4
+cryptography>=41.0.0
+
+# Database
+psycopg2-binary>=2.9.9
+
+# LLM Dependencies - Two-Tier Architecture
+# Tier 1: Google Gemini (fast, cheap)
+google-generativeai==0.3.2
+google-genai>=0.2.0
+
+# Tier 2: Anthropic Claude (fallback, better quality)
+anthropic==0.40.0
+
+# Optional: Other providers (legacy compatibility)
+# openai==1.12.0  # Uncomment if using OpenAI
+
+# Utilities
+urllib3==2.1.0
+python-dotenv==1.0.0
+
+# Web Scraping & Crawling
+beautifulsoup4==4.12.2
+lxml>=5.1.0
+playwright==1.40.0  # For JavaScript-rendered content and browser automation
+
+# Async/Threading
+aiohttp>=3.9.1
+
+# Monitoring/Alerts (optional)
+# twilio==8.11.1  # Uncomment if using SMS alerts
+
+# Development
+pytest==7.4.3
+pytest-cov==4.1.0

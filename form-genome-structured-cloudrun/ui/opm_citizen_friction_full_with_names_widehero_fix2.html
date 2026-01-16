@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>OPM Forms — Citizen Friction &amp; Full Results</title>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --accent:#76A922;
+  --ink:#222;
+  --muted:#666;
+  --hair:#EAEAEA;
+  --bg:#FAFAFA;
+  --card:#FFFFFF;
+  --warn:#C43D00;
+  --note:#6B7280;
+  --radius:18px;
+  --shadow: 0 6px 18px rgba(0,0,0,.06);
+  --space: clamp(28px, 5vw, 64px);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:"Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color:var(--ink); background:var(--bg); line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+a{color:inherit}
+.container{max-width:1440px;margin:0 auto;padding:0 var(--space)}
+.section{padding: calc(var(--space) * 1.25) 0}
+h1{ font-size: clamp(38px, 6vw, 64px); line-height:1.15; margin:0 0 14px 0; font-weight:800; letter-spacing:-0.02em; }
+h2{ font-size: clamp(24px, 4vw, 32px); margin:0 0 12px 0; font-weight:700; letter-spacing:-0.01em; }
+.sub{ color:var(--muted); max-width: 64ch; font-size: clamp(16px, 2vw, 18px); }
+.stats{ display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:14px; margin-top:24px; }
+@media (max-width: 720px){ .stats{grid-template-columns: repeat(2,1fr)}
+}
+.stat{ border:1px solid var(--hair); border-radius:14px; background:#fff; padding:14px 16px; box-shadow: var(--shadow); }
+.stat .num{ font-weight:800; font-size: clamp(22px, 4vw, 30px); color:var(--accent); line-height:1.2; }
+.stat .label{font-size:13px;color:var(--note);margin-top:4px}
+.hero-card{ background:var(--card); border:1px solid var(--hair); border-radius: var(--radius); box-shadow: var(--shadow); padding: clamp(18px, 3vw, 28px); margin-top: 40px; }
+.hards{ display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:14px; margin-top: 6px; }
+@media (max-width: 720px){ .hards{grid-template-columns:1fr} }
+.hard{ display:flex; gap:12px; align-items:flex-start; border:1px dashed var(--hair); background:#fff; border-radius:14px; padding:14px; }
+.hard svg{min-width:24px; margin-top:2px}
+.hard strong{display:block}
+.badge{ display:inline-block; padding:.25rem .6rem; border-radius:999px; border:1px solid var(--hair); background:#fff; font-size:12px; margin-left:8px; }
+.note{ color: var(--note); font-size: 14px; margin-top: 2px; }
+.divider{ height:1px; background:var(--hair); margin: calc(var(--space) * .75) 0; }
+.controls{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.search{ flex:1 1 280px; display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--hair); border-radius:999px; padding:8px 14px; }
+.search input{ width:100%; border:0; outline:0; font-size:15px; background:transparent; }
+.quickfilters{ display:flex; gap:10px; flex-wrap:wrap; }
+.qf{ border:1px solid var(--hair); background:#fff; border-radius:999px; padding:8px 12px; font-size:13px; cursor:pointer; }
+.qf.active{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(118,169,34,.12) }
+.table-wrap{ background:var(--card); border:1px solid var(--hair); border-radius: var(--radius); box-shadow: var(--shadow); overflow:clip; }
+.table-inner{ width:100%; overflow:auto; }
+table{ width:100%; border-collapse:collapse; min-width:1100px;}
+thead th{ position:sticky; top:0; z-index:1; background:#fff; border-bottom:1px solid var(--hair);
+  font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:#444; padding:12px 14px; text-align:left; cursor:pointer; }
+tbody td{ border-top:1px solid #F3F3F3; padding:12px 14px; vertical-align:top; font-size:14px; }
+tbody tr:hover{ background:#FBFEF7 }
+th.sort-asc::after{ content:" ↑"; color:#999 }
+th.sort-desc::after{ content:" ↓"; color:#999 }
+.pills{ display:flex; gap:6px; flex-wrap:wrap; }
+.pill{ border:1px solid var(--hair); border-radius:999px; padding:2px 8px; font-size:12px; background:#fff; }
+.mini{ display:block; height:6px; width:120px; background:#EEE; border-radius:3px; }
+.mini > span{ display:block; height:100%; background:var(--accent); border-radius:3px; }
+.footer{ color:#888; font-size:13px; text-align:center; padding: calc(var(--space) * .75) 0; }
+
+/* Ensure hero-card expands full width of content column */
+.hero-card { display: block; width: 100%; }
+/* Make table section slightly wider spacing on large screens */
+@media (min-width: 1280px) {
+  .container { padding-left: clamp(24px, 4vw, 48px); padding-right: clamp(24px, 4vw, 48px); }
+}
+
+/* Hero card fix */
+.hero-card { display:block; width:100%; margin-top:40px; }
+.hero-card h2 { font-size:28px; margin-bottom:14px; }
+
+/* Form name styling */
+td:first-child a {
+  font-weight:600;
+  color: #111 !important;
+  text-decoration:none;
+  font-size:15px;
+}
+td:first-child a:hover { text-decoration:underline; }
+
+/* Ensure hero-card is aligned to container and same width as stats */
+.hero-card {
+  display:block;
+  width:100%;
+  max-width:100%;
+  margin-left:auto;
+  margin-right:auto;
+  box-sizing:border-box;
+}
+.hero-card .hards {
+  width:100%;
+}
+
+/* ==== Hard fix for layout squeezing ==== */
+/* If any ancestor is a grid, force hero-card to span all columns */
+.hero-card { grid-column: 1 / -1 !important; }
+/* Ensure hero-card lives in normal block flow with full container width */
+.section > .container > .hero-card { display:block !important; width:100% !important; max-width:100% !important; }
+/* Make the inner cards layout robust: exactly two columns on >= 900px */
+@media (min-width: 900px) {
+  .hards { display:grid !important; grid-template-columns: 1fr 1fr !important; gap:14px !important; }
+}
+/* On smaller screens, single column */
+@media (max-width: 899.98px) {
+  .hards { display:grid !important; grid-template-columns: 1fr !important; }
+}
+/* Prevent icons or long text from shrinking the grid columns */
+.hard { min-width: 0 !important; }
+.hard svg { flex: 0 0 auto; }
+.hard div { min-width: 0; }
+/* Ensure stats grid doesn't accidentally wrap hero-card */
+.stats { margin-bottom: 8px !important; }
+</style>
+</head>
+<body>
+<div class="section">
+<div class="container">
+<h1>Where citizens feel the friction</h1>
+<p class="sub">
+      This report spotlights the moments that make OPM forms hard to complete — attachments you must chase down,
+      notarizations that force an in-person visit, and dense conditional questions that create uncertainty.
+    </p>
+<div class="stats">
+<div class="stat"><div class="num">92</div><div class="label">Total forms analyzed</div></div>
+<div class="stat"><div class="num">33</div><div class="label">Avg. complexity score</div></div>
+<div class="stat"><div class="num">71%</div><div class="label">Collect sensitive PII</div></div>
+<div class="stat"><div class="num">46%</div><div class="label">Require attachments</div></div>
+<div class="stat"><div class="num">5%</div><div class="label">Need a notary/witness</div></div>
+<div class="stat"><div class="num">52%<!--</div--><div class="label">Use conditional logic</div></div>
+</div>
+<div aria-label="What makes this hard" class="hero-card">
+<h2>What makes this hard</h2>
+<div class="hards">
+<div class="hard">
+<svg aria-hidden="true" fill="none" height="24" stroke="#C43D00" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M21.44 11.05l-8.49 8.49a6 6 0 11-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.9 9.9a2 2 0 11-2.83-2.83l8.49-8.49"></path></svg>
+<div>
+<strong>Attachment hunting</strong>
+<span class="badge">46% of forms</span>
+<div class="note">Citizens must track down proofs (marriage certificates, letters, IDs) across agencies — a common derail.</div>
+</div>
+</div>
+<div class="hard">
+<svg aria-hidden="true" fill="none" height="24" stroke="#C43D00" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M9 7a3 3 0 116 0 3 3 0 01-6 0z"></path><path d="M5 22h14"></path><path d="M4 18h16a1 1 0 001-1v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2a1 1 0 001 1z"></path></svg>
+<div>
+<strong>Notary bottlenecks</strong>
+<span class="badge">5% require in-person steps</span>
+<div class="note">Any notarization introduces scheduling, travel, and access issues — disproportionately tough for caregivers &amp; hourly workers.</div>
+</div>
+</div>
+<div class="hard">
+<svg aria-hidden="true" fill="none" height="24" stroke="#C43D00" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M6 3v6a4 4 0 004 4h4"></path><circle cx="6" cy="3" r="2"></circle><circle cx="14" cy="13" r="2"></circle><circle cx="18" cy="21" r="2"></circle><path d="M14 15v4a2 2 0 002 2"></path></svg>
+<div>
+<strong>Conditional confusion</strong>
+<span class="badge">52% include branching</span>
+<div class="note">“If this, then that” logic raises error risk and drives NIGO returns when people misread eligibility paths.</div>
+</div>
+</div>
+<div class="hard">
+<svg aria-hidden="true" fill="none" height="24" stroke="#C43D00" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24" width="24"><path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4z"></path></svg>
+<div>
+<strong>High PII burden</strong>
+<span class="badge">71% collect PII</span>
+<div class="note">Sensitive data (e.g., SSN) raises anxiety and slows completion when citizens don’t have details on hand.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div aria-hidden="true" class="divider container" role="separator"></div>
+<div class="section">
+<div class="container">
+<div class="controls">
+<div class="search">
+<svg aria-hidden="true" fill="none" height="18" stroke="#888" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18"><circle cx="11" cy="11" r="8"></circle><line x1="21" x2="16.65" y1="21" y2="16.65"></line></svg>
+<input id="searchInput" placeholder="Search by form name, category, or notes…" type="search"/>
+</div>
+<div aria-label="Quick filters" class="quickfilters">
+<button class="qf" data-filter="Attachments">Attachments</button>
+<button class="qf" data-filter="Notary">Notary</button>
+<button class="qf" data-filter="Conditional">Conditional</button>
+<button class="qf" data-filter="PII">PII</button>
+<button class="qf" data-reset="">Reset</button>
+</div>
+</div>
+<div class="table-wrap">
+<div class="table-inner">
+<table aria-describedby="tableHelp" id="allFormsTable">
+<thead>
+<tr>
+<th data-col="form">Form</th>
+<th data-col="category">Category</th>
+<th data-col="pages">Pages</th>
+<th data-col="complexity">Complexity</th>
+<th data-col="attachments">Attachments</th>
+<th data-col="notary">Notary</th>
+<th data-col="conditional">Conditional</th>
+<th data-col="pii">PII</th>
+<th data-col="drivers">Key Drivers &amp; Requirements</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1496.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1496</a> — OMB No. 3206-0121</td>
+<td>OPM Forms</td>
+<td>14</td>
+<td>96</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; notary/witness needed; branching questions; sensitive PII (e.g., SSN); witness signature rules</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2809.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2809</a> — Form Approved:</td>
+<td>Standard Forms</td>
+<td>18</td>
+<td>74</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm2809.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM2809</a> — Federal Employees</td>
+<td>OPM Forms</td>
+<td>13</td>
+<td>72</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri20-7.pdf" style="color:#fff;text-decoration:none" target="_blank">RI20</a> — OMB Approval 3206-0140</td>
+<td>Retirement &amp; Insurance</td>
+<td>5</td>
+<td>65</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; notary/witness needed; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2823.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2823</a> — OMB $SSURYDO3206-0136</td>
+<td>Standard Forms</td>
+<td>3</td>
+<td>64</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); witness signature rules; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3102.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3102</a> — OMB Approval 3206-0173</td>
+<td>Standard Forms</td>
+<td>3</td>
+<td>64</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); witness signature rules; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3110.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3110</a> — Whe n properly completed, this form is considered a part of</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>62</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; notary/witness needed; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/fe6.pdf" style="color:#fff;text-decoration:none" target="_blank">FE6</a> — Claim for Death Benefits</td>
+<td>FEGLI</td>
+<td>8</td>
+<td>61</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf86.pdf" style="color:#fff;text-decoration:none" target="_blank">SF86</a> — Depending upon the purpose of your investigation, the U.S. Government is</td>
+<td>Standard Forms</td>
+<td>136</td>
+<td>60</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf85p.pdf" style="color:#fff;text-decoration:none" target="_blank">SF85P</a> — Standard Form 85P</td>
+<td>Standard Forms</td>
+<td>95</td>
+<td>60</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2810.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2810</a> — 8. Date this action becomes</td>
+<td>Standard Forms</td>
+<td>7</td>
+<td>60</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri_76-10.pdf" style="color:#fff;text-decoration:none" target="_blank">RI 76</a> — Name of Insured (Last, first, middle)</td>
+<td>Retirement &amp; Insurance</td>
+<td>4</td>
+<td>59</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); witness signature rules; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2821.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2821</a> — U.S. Office of Personnel Management</td>
+<td>Standard Forms</td>
+<td>4</td>
+<td>57</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3109.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3109</a> — Election of Coverage</td>
+<td>Standard Forms</td>
+<td>3</td>
+<td>56</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf85.pdf" style="color:#fff;text-decoration:none" target="_blank">SF85</a> — General Electronic Form Notes/Notices (all Sections)</td>
+<td>Standard Forms</td>
+<td>18</td>
+<td>54</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf85ps.pdf" style="color:#fff;text-decoration:none" target="_blank">SF85PS</a> — Form approved:</td>
+<td>Standard Forms</td>
+<td>16</td>
+<td>54</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2819.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2819</a> — Genera l information about conversion</td>
+<td>Standard Forms</td>
+<td>3</td>
+<td>54</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2800a.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2800A</a> — OMB Approval 3206-0156</td>
+<td>Standard Forms</td>
+<td>8</td>
+<td>53</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2805.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2805</a> — Request for Recovery of Debt Due the United States</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>52</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3119.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3119</a> — Application for Court-Ordered Benefits for Former Spouse</td>
+<td>Standard Forms</td>
+<td>4</td>
+<td>49</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm2810.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM2810</a> — Federal Employees</td>
+<td>OPM Forms</td>
+<td>4</td>
+<td>49</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2804.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2804</a> — APPLICATION TO MAKE VOLUNTARY CONTRIBUTIONS (1) Type or print in ink.</td>
+<td>Standard Forms</td>
+<td>3</td>
+<td>48</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1515.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1515</a> — Military Service Deposit Election</td>
+<td>OPM Forms</td>
+<td>3</td>
+<td>48</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1519.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1519</a> — Signature</td>
+<td>OPM Forms</td>
+<td>3</td>
+<td>48</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1397.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1397</a> — Section III - Staffing Status</td>
+<td>OPM Forms</td>
+<td>10</td>
+<td>47</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+<td>supporting documents required; branching questions; strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3111.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3111</a> — Before completing this form, read the attached Instructions for Employees and Information for Employees.</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>47</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1654a.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1654A</a> — OPM Form 1654-A</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>47</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1654-b.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1654</a> — OPM Form 1654-B</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>47</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri30-1.pdf" style="color:#fff;text-decoration:none" target="_blank">RI30</a> — This Questionnaire Must Be Returned Within 90 Days for Your Disability Annuity to Continue</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>47</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/fe6dep.pdf" style="color:#fff;text-decoration:none" target="_blank">FE6DEP</a> — Statement of Claim - Option C</td>
+<td>FEGLI</td>
+<td>8</td>
+<td>46</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling; beneficiary &amp; order-of-precedence rules</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/SF2801PR.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2801PR</a> — Revised April 2019</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>43</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>supporting documents required; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3107pr.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3107PR</a> — Revised April 2019</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>43</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>supporting documents required; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1562.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1562</a> — Application For Return of Excess Retirement Deductions</td>
+<td>OPM Forms</td>
+<td>6</td>
+<td>42</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/media/dxrbwvmb/declaration-for-federal-employment-optional-form-august-2023.pdf" style="color:#fff;text-decoration:none" target="_blank">DECLARATION FOR </a> — Form Approved:</td>
+<td>Optional Forms</td>
+<td>3</td>
+<td>42</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf144.pdf" style="color:#fff;text-decoration:none" target="_blank">SF144</a> — STANDARD FORM 144 (Rev. 10/95)</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>41</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>notary/witness needed; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1643.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1643</a> — (Insert name of organization administering the program)</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>41</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm-form-1655-2027.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM FORM 1655 20</a> — United States Office of Personnel Management   Form Approved:</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>41</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1510.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1510</a> — Agency Certification</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>40</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf182.pdf" style="color:#fff;text-decoration:none" target="_blank">SF182</a> — Authorization, Agreement,</td>
+<td>Standard Forms</td>
+<td>9</td>
+<td>39</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/of311.pdf" style="color:#fff;text-decoration:none" target="_blank">OF311</a> — Approved by OMB</td>
+<td>Optional Forms</td>
+<td>2</td>
+<td>38</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri92-022_2021.pdf" style="color:#fff;text-decoration:none" target="_blank">RI92</a> — 2021 Annuity Supplement</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>38</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/of178.pdf" style="color:#fff;text-decoration:none" target="_blank">OF178</a> — To be given to the individual</td>
+<td>Optional Forms</td>
+<td>7</td>
+<td>36</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>supporting documents required; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri20-97.pdf" style="color:#fff;text-decoration:none" target="_blank">RI20</a> — Revised February 2023</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>35</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>supporting documents required; branching questions; sensitive PII (e.g., SSN)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2820.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2820</a> — Part 1 - Original</td>
+<td>Standard Forms</td>
+<td>4</td>
+<td>34</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri38-124.pdf" style="color:#fff;text-decoration:none" target="_blank">RI38</a> — Voluntary Contributions Election</td>
+<td>Retirement &amp; Insurance</td>
+<td>3</td>
+<td>33</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri30-010_2018_05.pdf" style="color:#fff;text-decoration:none" target="_blank">RI30</a> — Disabled Dependent Questionnaire</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>31</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>supporting documents required; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/inv60.pdf" style="color:#fff;text-decoration:none" target="_blank">INV60</a> — OPM Case # Request for Determination or Advisory</td>
+<td>Federal Investigation Forms</td>
+<td>2</td>
+<td>31</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>supporting documents required; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1303.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1303</a> — Presidential Management Fellows (PMF) Program</td>
+<td>OPM Forms</td>
+<td>3</td>
+<td>30</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>supporting documents required; strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf181.pdf" style="color:#fff;text-decoration:none" target="_blank">SF181</a> — U.S. Office of Personnel Management</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>30</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>supporting documents required; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1522.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1522</a> — United States</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>30</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>supporting documents required; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm-form-1655-a-2027.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM FORM 1655 A </a> — United  States  Office  of  Personnel  Management     Form Approved:</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>26</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri38-107.pdf" style="color:#fff;text-decoration:none" target="_blank">RI38</a> — Form Approved:</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>26</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); strict deadlines</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri38-133.pdf" style="color:#fff;text-decoration:none" target="_blank">RI38</a> — Certification for Physicians/Dentists of the Department of Veterans Affairs</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>26</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri38-147.pdf" style="color:#fff;text-decoration:none" target="_blank">RI38</a> — Form Approved:</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>26</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>branching questions; sensitive PII (e.g., SSN); strict deadlines</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/of69.pdf" style="color:#fff;text-decoration:none" target="_blank">OF69</a> — OF 69 # (REV. 2-89)</td>
+<td>Optional Forms</td>
+<td>4</td>
+<td>24</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1514.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1514</a> — Service Credit Payments for Post-1956 Military Service</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>22</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri20-122.pdf" style="color:#fff;text-decoration:none" target="_blank">RI20</a> — Certification for Physicians Comparability Allowances (PCA)</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>22</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf61.pdf" style="color:#fff;text-decoration:none" target="_blank">SF61</a> — (Position to which Appointed) (Date Appointed)</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>22</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>notary/witness needed; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1749.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1749</a> — U.S. Office of Personnel Management</td>
+<td>OPM Forms</td>
+<td>7</td>
+<td>21</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1828.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1828</a> — DATA ELEMENT/NEW REQUIREMENT REQUEST FORM</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>18</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+<td>branching questions; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf256.pdf" style="color:#fff;text-decoration:none" target="_blank">SF256</a> — (Please read the Privacy Act information and additional instructions on Page 2)</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>16</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf813.pdf" style="color:#fff;text-decoration:none" target="_blank">SF813</a> — To: (Select appropriate address from reverse.)</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>16</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf144a.pdf" style="color:#fff;text-decoration:none" target="_blank">SF144A</a> — Office of Personnel Management</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>15</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf1187.pdf" style="color:#fff;text-decoration:none" target="_blank">SF1187</a> — I hereby authorize the above named agency to deduct from my pay each</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>15</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2807.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2807</a> — Standard Form 2807	 Register of Separations</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>15</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3100.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3100</a> — Last Name First Name Middle Name</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>15</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf3103.pdf" style="color:#fff;text-decoration:none" target="_blank">SF3103</a> — Register Of Separations and Transfers</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>15</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/of5057.pdf" style="color:#fff;text-decoration:none" target="_blank">OF5057</a> — United  States</td>
+<td>Optional Forms</td>
+<td>1</td>
+<td>15</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm71.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM71</a> — Request for Leave or Approved Absence</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>15</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>sensitive PII (e.g., SSN); third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1308.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1308</a> — Presidential  Management Fellow (PMF)</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>14</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1310.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1310</a> — Presidential Management Fellows (PMF) Program</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>14</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/opm1750a.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1750A</a> — Quarterly Time To Hire FY 11</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>13</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/opm1750b.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1750B</a> — Quarterly Time To Hire FY 12</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>13</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/opm1750c.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1750C</a> — Quarterly Time To Hire for FY 13</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>13</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>strict deadlines; third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm5058.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM5058</a> — Agency Request for COVID-19</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>13</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency); fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1558.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1558</a> — Part A - General Information</td>
+<td>OPM Forms</td>
+<td>6</td>
+<td>12</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri20-064.pdf" style="color:#fff;text-decoration:none" target="_blank">RI20</a> — Form Approved:U.S. Office of Personnel Management OMB number: 3206-0235</td>
+<td>Retirement &amp; Insurance</td>
+<td>1</td>
+<td>11</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+<td>branching questions</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf75.pdf" style="color:#fff;text-decoration:none" target="_blank">SF75</a> — 5HTXHVWIRU3UHOLPLQDU\(PSOR\PHQW’DWD</td>
+<td>Standard Forms</td>
+<td>4</td>
+<td>10</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/opm1623.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1623</a> — List of Experts and Consultants Hired Under 5 U.S.C. 3109</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>8</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1748.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1748</a> — Hiring Reform Evaluation Report Template</td>
+<td>OPM Forms</td>
+<td>2</td>
+<td>8</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/ri37-026-2017.pdf" style="color:#fff;text-decoration:none" target="_blank">RI37</a> — United States</td>
+<td>Retirement &amp; Insurance</td>
+<td>2</td>
+<td>8</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>fees/payment handling</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf113a.pdf" style="color:#fff;text-decoration:none" target="_blank">SF113A</a> — Figures for Chapter II. Monthly Report of Federal Civilian Employnent (SF 113-A) II-25</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf113g.pdf" style="color:#fff;text-decoration:none" target="_blank">SF113G</a> — (1) (2) (3) (4)</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/sf2812a-1.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2812A</a> — Report of Withholdings and Contributions for Health Benefits By Enrollment Code</td>
+<td>Standard Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm913b.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM913B</a> — 1. Agency:</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1351a.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1351A</a> — OPM Form 1351-A (Rev. 11/97)</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1351b.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1351B</a> — OPM Form 1351-B (Re v. 11/97)</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1351c.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1351C</a> — OPM Form 1351-C (Rev. 11/97)</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1396.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1396</a> — ___________________________________________________________________________________</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>7</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>third-party involvement (physician/employer/agency)</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/sf50.pdf" style="color:#fff;text-decoration:none" target="_blank">SF50</a> — Sf50</td>
+<td>Standard Forms</td>
+<td>6</td>
+<td>6</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>standard information capture</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdfimage/sf2806.pdf" style="color:#fff;text-decoration:none" target="_blank">SF2806</a> — /$671$0( ),5671$0( 0,’’/(1$0( ’$7(2)%,57+ 62&amp;6(&amp;12 $*(1&amp;&lt; 3$&lt;52//2)),&amp;( /2&amp;$7,21 3$&lt;2//2)),&amp;(12</td>
+<td>Standard Forms</td>
+<td>2</td>
+<td>2</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>standard information capture</td>
+</tr><tr>
+<td><a href="https://www.opm.gov/forms/pdf_fill/opm1644.pdf" style="color:#fff;text-decoration:none" target="_blank">OPM1644</a> — Please wait...</td>
+<td>OPM Forms</td>
+<td>1</td>
+<td>1</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>standard information capture</td>
+</tr></tbody>
+</table>
+</div>
+</div>
+<p id="tableHelp" style="color:#777; font-size:13px; margin-top:10px;">
+      Tip: Click a header to sort. Use quick filters to show forms that include those friction drivers. Search matches across name, category, and notes.
+    </p>
+</div>
+</div>
+<div class="footer">
+  Generated from OPM Forms analysis • Designed for clarity &amp; empathy
+</div>
+<script>
+(function(){
+  const table = document.getElementById('allFormsTable');
+  const tbody = table.querySelector('tbody');
+  const headers = Array.from(table.querySelectorAll('thead th'));
+  const searchInput = document.getElementById('searchInput');
+  const qfs = Array.from(document.querySelectorAll('.qf'));
+  let sortState = { col: null, dir: 1 };
+  let activeFilter = null;
+
+  function getCellText(tr, index){
+    return (tr.children[index]?.innerText || '').trim().toLowerCase();
+  }
+
+  function applySearchAndFilter(){
+    const q = (searchInput.value || '').toLowerCase();
+    Array.from(tbody.rows).forEach(tr => {
+      const rowText = tr.innerText.toLowerCase();
+      const matchesSearch = !q || rowText.includes(q);
+      let matchesFilter = true;
+      if(activeFilter){
+        const colMap = { 'Attachments':4, 'Notary':5, 'Conditional':6, 'PII':7 };
+        const idx = colMap[activeFilter];
+        const v = getCellText(tr, idx);
+        matchesFilter = v.startsWith('y'); // "Yes"
+      }
+      tr.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
+    });
+  }
+
+  function sortBy(colIndex, numeric=false){
+    const rows = Array.from(tbody.rows).filter(r => r.style.display !== 'none');
+    const dir = (sortState.col === colIndex) ? -sortState.dir : 1;
+    sortState = { col: colIndex, dir };
+    headers.forEach(h => h.classList.remove('sort-asc','sort-desc'));
+    headers[colIndex].classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
+    rows.sort((a,b)=>{
+      const A = getCellText(a, colIndex);
+      const B = getCellText(b, colIndex);
+      if(numeric){
+        const nA = parseFloat(A) || 0, nB = parseFloat(B) || 0;
+        return (nA - nB) * dir;
+      }
+      return A.localeCompare(B) * dir;
+    });
+    const frag = document.createDocumentFragment();
+    rows.forEach(r => frag.appendChild(r));
+    tbody.appendChild(frag);
+  }
+
+  headers.forEach((th, i)=>{
+    const key = th.dataset.col || '';
+    const numeric = ['pages','complexity'].includes(key);
+    th.addEventListener('click', ()=> sortBy(i, numeric));
+  });
+
+  searchInput.addEventListener('input', applySearchAndFilter);
+
+  qfs.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(btn.hasAttribute('data-reset')){
+        activeFilter = null;
+        qfs.forEach(b=>b.classList.remove('active'));
+      } else {
+        const val = btn.getAttribute('data-filter');
+        if(activeFilter === val){
+          activeFilter = null;
+          btn.classList.remove('active');
+        } else {
+          activeFilter = val;
+          qfs.forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+        }
+      }
+      applySearchAndFilter();
+    });
+  });
+
+  // Enhance complexity cells into tiny bars
+  (function enhanceComplexityBars(){
+    const rows = Array.from(tbody.rows);
+    rows.forEach(tr=>{
+      const c = tr.children[3];
+      if(!c) return;
+      const v = parseFloat(c.textContent.trim());
+      if(!isNaN(v)){
+        c.setAttribute('data-score', v);
+        c.innerHTML = '<span class="mini"><span style="width:'+Math.max(0,Math.min(100,v))+'%"></span></span>';
+      }
+    });
+  })();
+})();
+</script>
+</div></body>
+</html>

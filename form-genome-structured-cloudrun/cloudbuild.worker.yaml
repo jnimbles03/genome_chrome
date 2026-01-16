@@ -1,0 +1,12 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/formgenome/form-genome-worker:latest'
+      - '-f'
+      - 'Dockerfile.worker'
+      - '.'
+images:
+  - 'gcr.io/formgenome/form-genome-worker:latest'
+timeout: 600s

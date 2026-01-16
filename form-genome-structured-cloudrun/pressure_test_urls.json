@@ -1,0 +1,58 @@
+{
+  "Credit Union": [
+    "https://www.navyfederal.org/content/dam/nfculibrary/dotcom/outreach/pdfs/membership/application-for-membership.pdf",
+    "https://www.becu.org/-/media/Files/PDF/Membership-Application-and-Agreement.pdf",
+    "https://www.penfed.org/content/dam/penfed/public/forms/membership-application.pdf",
+    "https://www.alliantcreditunion.org/images/uploads/files/AlliantMembershipAccountAgreement.pdf",
+    "https://www.firsttechfed.com/-/media/first-tech/v2/files/forms/membership/membership-application.pdf"
+  ],
+  "Wealth Manager": [
+    "https://personal.vanguard.com/pdf/v340.pdf",
+    "https://www.fidelity.com/bin-public/060_www_fidelity_com/documents/customer-service/IRA-account-application.pdf",
+    "https://www.schwab.com/public/file/P-221008/GEN_APPLICATION_BROKERAGE_IRA.pdf",
+    "https://www.edwardjones.com/sites/default/files/customer-service/forms/edward-jones-account-agreement.pdf",
+    "https://www.morganstanley.com/content/dam/msdotcom/en/assets/pdfs/client-service/forms/ira-distribution-form.pdf"
+  ],
+  "Insurance": [
+    "https://www.statefarm.com/content/dam/sf-library/en-us/pdf/sf-bank-ira-distribution-form.pdf",
+    "https://www.geico.com/content/dam/geico/library/forms/claims/medical-authorization-form.pdf",
+    "https://www.progressive.com/content/dam/progressive/progressive-brand/pdf/medical-authorization.pdf",
+    "https://www.libertymutual.com/content/dam/lm/library/claims/general/authorization-for-release-of-information.pdf",
+    "https://www.allstate.com/content/dam/allstate/pdfs/claims/authorization-release-information.pdf"
+  ],
+  "Healthcare Payer": [
+    "https://www.uhc.com/content/dam/uhcdotcom/en/Forms/Medical-Claim-Form.pdf",
+    "https://www.humana.com/content/dam/humana/en/forms/medical-claim-form.pdf",
+    "https://www.anthem.com/docs/inline/medical-claim-form.pdf",
+    "https://www.cigna.com/static/www-cigna-com/docs/individuals-families/medical-claim-form.pdf",
+    "https://www.aetna.com/content/dam/aetna/pdfs/aetnadotcom/customercare/forms/medical-claim-form.pdf"
+  ],
+  "Healthcare Provider": [
+    "https://www.mayoclinic.org/node/1020224/content/dam/mayoclinic/documents/forms/registration-form.pdf",
+    "https://my.clevelandclinic.org/-/scassets/files/org/visit/patient-registration-form.pdf?la=en",
+    "https://healthy.kaiserpermanente.org/content/dam/kporg/member/pdfs/registrations/membership-application.pdf",
+    "https://hcahealthcare.com/util/forms/patient-registration-form.pdf",
+    "https://www.hopkinsmedicine.org/content/dam/hopkinsmedicine/documents/patient-care/forms/Maryland-Uniform-Referral-Form.pdf"
+  ],
+  "Life Sciences": [
+    "https://www.pfizer.com/sites/default/files/investors/financial_reports/annual_reports/2022/files/Pfizer-2022-Proxy-Statement.pdf",
+    "https://www.modernatx.com/sites/default/files/Moderna-COVID-19-Vaccination-Record-Card.pdf",
+    "https://www.questdiagnostics.com/content/dam/corporate/restricted/test-directory/patient-forms/patient-authorization-form.pdf",
+    "https://www.labcorp.com/sites/default/files/patient-authorization-for-release-of-protected-health-information.pdf",
+    "https://www.merck.com/wp-content/uploads/MERCK-PATIENT-ASSISTANCE-PROGRAM-ENROLLMENT-FORM.pdf"
+  ],
+  "State & Local Gov": [
+    "https://www.tceq.texas.gov/assets/public/permitting/radioactive_mat/forms/20462.pdf",
+    "https://www.dmv.ca.gov/portal/uploads/2020/06/reg31.pdf",
+    "https://www.health.ny.gov/forms/doh-4220.pdf",
+    "https://floridarevenue.com/Forms_library/current/dr1.pdf",
+    "https://www.sos.state.tx.us/corp/forms/205_boc.pdf"
+  ],
+  "Federal Gov": [
+    "https://www.irs.gov/pub/irs-pdf/f1040.pdf",
+    "https://www.ssa.gov/forms/ss-5.pdf",
+    "https://www.sec.gov/files/form4.pdf",
+    "https://www.sba.gov/sites/default/files/2023-08/SBA%20Form%201919.pdf",
+    "https://eforms.state.gov/Forms/ds82.pdf"
+  ]
+}
