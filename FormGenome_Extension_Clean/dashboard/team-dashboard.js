@@ -232,12 +232,15 @@ function renderTable() {
     const isMyForm = form.user_id === myUserId;
     const rowId = `${form.user_id}_${form.analysis_id}`;
 
+    const formattedDate = new Date(form.analyzed_at || Date.now());
+    const isRecent = (Date.now() - formattedDate.getTime()) < 5 * 60 * 1000; // 5 minutes
+
     const cells = orderedColumns.map(col => {
       return renderCell(col.key, form, isMyForm, rowId);
     }).join('');
 
     return `
-      <tr class="${isMyForm ? 'editable' : ''}"
+      <tr class="${isMyForm ? 'editable' : ''} ${isRecent ? 'recently-updated' : ''}"
           data-row-id="${rowId}"
           data-analysis-id="${form.analysis_id}"
           data-form='${JSON.stringify(form).replace(/'/g, "&apos;")}'>
