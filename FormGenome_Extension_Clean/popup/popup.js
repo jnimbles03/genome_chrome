@@ -486,6 +486,11 @@ function displayResults(data) {
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('status').classList.add('hidden');
 
+  // Auto-scroll to results
+  setTimeout(() => {
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+
   // Title - use pretty_title or form_name, not the filename
   document.getElementById('formTitle').textContent = data.pretty_title || data.form_name || data.title || 'Untitled Form';
 
