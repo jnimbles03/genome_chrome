@@ -69,6 +69,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     } else if (message.type === 'PDF_LINK_CLICKED') {
       console.log('PDF link clicked:', message.url);
+    } else if (message.type === 'FETCH_PAGE') {
+      // Fetch external page content (bypassing CORS for content script)
+      fetch(message.url)
+        .then(response => response.text())
+        .then(text => {
+          sendResponse({ success: true, html: text });
+        })
+        .catch(error => {
+          console.error('Fetch failed:', error);
+          sendResponse({ success: false, error: error.message });
+        });
+      return true; // Keep channel open for async response
     }
   } catch (error) {
     console.error('Error handling message:', error);

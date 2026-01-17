@@ -48,11 +48,10 @@ async function validatePdfUrl(url) {
 }
 
 // Find all PDF links on the page and group by language
-async function findPdfLinks() {
-  const links = document.querySelectorAll('a[href]');
+async function findPdfLinks(rootElement = document) {
+  const links = rootElement.querySelectorAll('a[href]');
   const pdfMap = new Map(); // Key: Base form name, Value: Object with details
 
-  // Keywords that suggest a link is a form even if no .pdf extension
   // Keywords that suggest a link is a form even if no .pdf extension
   const formKeywords = [
     '/form/', '/forms/', '/resource/', '/document/', 'form-', '-form',
@@ -163,6 +162,72 @@ async function findPdfLinks() {
   return await Promise.all(validationPromises);
 }
 
+function findPaginationLinks() {
+  const urls = new Set();
+  const links = document.querySelectorAll('a[href]');
+
+  links.forEach(link => {
+    const text = link.textContent.trim().toLowerCase();
+    const rel = (link.getAttribute('rel') || '').toLowerCase();
+
+    // Check standard pagination patterns
+    if (rel === 'next' || rel === 'prev') {
+      urls.add(link.href);
+    } else if (text === 'next' || text === 'previous' || text === 'next page' || text === 'previous page' || text === '>' || text === '<') {
+      urls.add(link.href);
+    } else if (text.match(/^\d+$/) && link.href.includes('page')) {
+      // Numbered pagination (e.g., "2", "3")
+      // Check if it's close to current (heuristic)
+      urls.add(link.href);
+    }
+  });
+
+  // Limit to reasonable neighbors to prevent crawling the whole site
+  // Ideally we want just the immediately adjacent pages
+  return Array.from(urls).slice(0, 3);
+}
+
+
+// Perform Deep Scan (Fetch standard neighbors)
+async function performDeepScan() {
+  const targetUrls = findPaginationLinks();
+  let allPdfs = [];
+
+  for (const url of targetUrls) {
+    try {
+      // Request background to fetch
+      const response = await new Promise(resolve => {
+        chrome.runtime.sendMessage({ type: 'FETCH_PAGE', url: url }, resolve);
+      });
+
+      if (response && response.success) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(response.html, 'text/html');
+
+        // Set base URI so relative links resolve correctly
+        const base = doc.createElement('base');
+        base.href = url;
+        doc.head.appendChild(base);
+
+        // Scan this document
+        const pdfs = await findPdfLinks(doc);
+
+        // Tag them
+        pdfs.forEach(p => {
+          p.source_page = "Neighbor";
+          p.badge_type = "deep-scan"; // Use distinct badge
+        });
+
+        allPdfs = [...allPdfs, ...pdfs];
+      }
+    } catch (e) {
+      console.error('Deep scan error for', url, e);
+    }
+  }
+
+  return allPdfs;
+}
+
 // Helper function to safely send messages (handles extension reload)
 function safeSendMessage(message) {
   try {
@@ -227,6 +292,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       return true; // Keep channel open for async response
     }
+  } else if (request.type === 'START_DEEP_SCAN') {
+    performDeepScan().then(deepPdfs => {
+      sendResponse({
+        success: true,
+        pdfs: deepPdfs
+      });
+    });
+    return true;
   }
 });
 

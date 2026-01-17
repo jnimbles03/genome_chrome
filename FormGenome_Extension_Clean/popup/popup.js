@@ -58,7 +58,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Set up event listeners
   document.getElementById('selectAll').addEventListener('change', handleSelectAll);
+  document.getElementById('selectAll').addEventListener('change', handleSelectAll);
   document.getElementById('analyzeBatch').addEventListener('click', handleBatchAnalysis);
+  document.getElementById('deepScan').addEventListener('click', handleDeepScan);
   document.getElementById('analyzeSingle').addEventListener('click', handleSingleAnalysis);
   document.getElementById('clearCache').addEventListener('click', handleClearCache);
   document.getElementById('generateReport').addEventListener('click', () => {
@@ -199,6 +201,10 @@ function renderPdfList() {
       badge += `<span class="lang-badge warning" title="URL is broken or blocked. Click the form link on the page first.">⚠️ Click to Open</span>`;
     } else if (pdf.action === 'peek') {
       badge += `<span class="lang-badge implicit" title="This is a landing page. Click to peek for PDF.">🔍 Landing Page</span>`;
+    }
+
+    if (pdf.badge_type === 'deep-scan') {
+      badge += `<span class="lang-badge deep-scan" title="Found on neighboring page">Neighbor Page</span>`;
     }
 
     // Determine button based on action
@@ -584,3 +590,46 @@ window.forceClearCache = async function () {
   analysisCache = {};
   console.log('[FORM GENOME] Force cleared! Reload the popup to see changes.');
 };
+
+async function handleDeepScan() {
+  const deepScanBtn = document.getElementById('deepScan');
+  deepScanBtn.disabled = true;
+  deepScanBtn.textContent = 'Scanning Neighbors...';
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+  try {
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'START_DEEP_SCAN' });
+
+    if (response && response.success && response.pdfs) {
+      const newPdfs = response.pdfs;
+
+      // Merge with existing
+      const existingUrls = new Set(currentPdfs.map(p => p.url));
+      let addedCount = 0;
+
+      newPdfs.forEach(pdf => {
+        if (!existingUrls.has(pdf.url)) {
+          currentPdfs.push(pdf);
+          addedCount++;
+        }
+      });
+
+      if (addedCount > 0) {
+        showSuccess(`Deep Scan found ${addedCount} new forms!`);
+        renderPdfList();
+      } else {
+        showSuccess('Deep Scan complete. No new unique forms found.');
+      }
+
+    } else {
+      showError('Deep Scan failed or found no pagination links.');
+    }
+  } catch (error) {
+    console.error('Deep scan error:', error);
+    showError('Deep Scan error: ' + error.message);
+  } finally {
+    deepScanBtn.disabled = false;
+    deepScanBtn.textContent = 'Deep Scan';
+  }
+}
