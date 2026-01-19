@@ -417,12 +417,8 @@ async function handleBatchAnalysis() {
 
     try {
       // Use action to determine analysis method
-      // 'peek' means it's a landing page, so we use handleSingleAnalysisFromUrl logic (but adapted for batch return)
-      // Actually, existing logic used analyzePdf(url, true) for peek. 
-      // We should use the new robust logic if possible, but for now let's stick to direct PDF analysis 
-      // or simple URL analysis to avoid complexity in batch. 
-      // If action is 'peek', we might skip in batch or try the old way.
-      // Let's stick to standard analysis for batch to keep it fast.
+      // For batch processing, we use standard analysis to ensure speed.
+      // Complex peek logic is reserved for single-item analysis to avoid timeouts.
 
       const asUrl = action === 'peek';
       const result = await analyzePdf(url, asUrl);
