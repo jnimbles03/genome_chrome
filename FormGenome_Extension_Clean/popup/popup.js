@@ -283,17 +283,93 @@ function handleSelectAll(event) {
 }
 
 async function handleSingleAnalysisFromUrl(url) {
-  showStatus('Peeking at landing page...');
+  showStatus('Peeking at landing page locally...');
+  try {
+    // 1. Fetch page via background (Client-side fetch to bypass 403)
+    const response = await chrome.runtime.sendMessage({ type: 'FETCH_PAGE', url: url });
+
+    if (!response || !response.success) {
+      console.warn('Client-side fetch failed, falling back to Server:', response?.error);
+      return await handleSingleAnalysisFromUrlFallback(url);
+    }
+
+    // 2. Parse HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(response.html, 'text/html');
+
+    // 3. Find PDF Link
+    let pdfUrl = null;
+
+    // Strategy A: Direct links
+    const links = Array.from(doc.querySelectorAll('a[href]'));
+    for (const link of links) {
+      // Resolve relative URLs
+      try {
+        const absoluteUrl = new URL(link.getAttribute('href'), url).href;
+        if (absoluteUrl.toLowerCase().endsWith('.pdf') || absoluteUrl.toLowerCase().includes('.pdf?')) {
+          pdfUrl = absoluteUrl;
+          break;
+        }
+      } catch (e) { }
+    }
+
+    // Strategy B: Iframes
+    if (!pdfUrl) {
+      const iframes = Array.from(doc.querySelectorAll('iframe[src]'));
+      for (const iframe of iframes) {
+        try {
+          const absoluteUrl = new URL(iframe.getAttribute('src'), url).href;
+          if (absoluteUrl.toLowerCase().endsWith('.pdf')) {
+            pdfUrl = absoluteUrl;
+            break;
+          }
+        } catch (e) { }
+      }
+    }
+
+    // Strategy C: Regex (Hidden JS links)
+    if (!pdfUrl) {
+      const regex = /["'](https?:\/\/[^"']+\.pdf(?:\?[^"']+)?)["']/i;
+      const match = response.html.match(regex);
+      if (match) pdfUrl = match[1];
+    }
+
+    if (!pdfUrl) {
+      throw new Error('No hidden PDF link found on this page.');
+    }
+
+    showStatus(`Found PDF: ${extractFilename(pdfUrl)}. Downloading & Analyzing...`);
+
+    // 4. Analyze found PDF (Client-side download + Upload)
+    const result = await analyzePdf(pdfUrl, false);
+
+    const cacheKey = `analysis_${hashUrl(url)}`;
+    result._cached_at = Date.now();
+    result.was_peaked = true;
+    result.original_url = url;
+
+    analysisCache[cacheKey] = result;
+    await chrome.storage.local.set({ [cacheKey]: result });
+
+    displayResults(result);
+
+  } catch (error) {
+    console.error('Peek failed:', error);
+    showError(error.message || 'Failed to peek at landing page');
+  }
+}
+
+async function handleSingleAnalysisFromUrlFallback(url) {
+  console.log('Using Server-side Peek fallback');
   try {
     const result = await analyzePdf(url, true);
     const cacheKey = `analysis_${hashUrl(url)}`;
     result._cached_at = Date.now();
     analysisCache[cacheKey] = result;
     await chrome.storage.local.set({ [cacheKey]: result });
-
     displayResults(result);
   } catch (error) {
-    showError(error.message || 'Failed to peek at landing page');
+    showError(error.message);
   }
 }
 
@@ -332,12 +408,22 @@ async function handleBatchAnalysis() {
   let completed = 0;
   const total = analyzablePdfs.length;
 
-  for (const { pdf, action } of analyzablePdfs) {
-    const url = pdf.url; // Use stable URL from state object, NOT dataset
-    updateBatchStatus(completed, total, url);
+  // Parallel Processing Configuration
+  const BATCH_SIZE = 3;
+
+  async function processItem(item) {
+    const { pdf, action } = item;
+    const url = pdf.url;
 
     try {
       // Use action to determine analysis method
+      // 'peek' means it's a landing page, so we use handleSingleAnalysisFromUrl logic (but adapted for batch return)
+      // Actually, existing logic used analyzePdf(url, true) for peek. 
+      // We should use the new robust logic if possible, but for now let's stick to direct PDF analysis 
+      // or simple URL analysis to avoid complexity in batch. 
+      // If action is 'peek', we might skip in batch or try the old way.
+      // Let's stick to standard analysis for batch to keep it fast.
+
       const asUrl = action === 'peek';
       const result = await analyzePdf(url, asUrl);
       const cacheKey = `analysis_${hashUrl(url)}`;
@@ -345,19 +431,22 @@ async function handleBatchAnalysis() {
       analysisCache[cacheKey] = result;
       await chrome.storage.local.set({ [cacheKey]: result });
 
-      completed++;
-      updateProgress((completed / total) * 100);
-      renderPdfList();
-
     } catch (error) {
       console.error('Analysis failed:', error);
       const cacheKey = `analysis_${hashUrl(url)}`;
       analysisCache[cacheKey] = { error: error.message };
-
+    } finally {
       completed++;
+      updateBatchStatus(completed, total, url);
       updateProgress((completed / total) * 100);
-      renderPdfList();
+      renderPdfList(); // Update UI incrementally
     }
+  }
+
+  // Process in chunks
+  for (let i = 0; i < analyzablePdfs.length; i += BATCH_SIZE) {
+    const chunk = analyzablePdfs.slice(i, i + BATCH_SIZE);
+    await Promise.all(chunk.map(item => processItem(item)));
   }
 
   // Complete
