@@ -188,10 +188,52 @@ function findPaginationLinks() {
 }
 
 
-// Perform Deep Scan (Fetch standard neighbors)
+// Find directory-like links that likely contain forms
+function findDirectoryLinks() {
+  const urls = new Set();
+  const links = document.querySelectorAll('a[href]');
+
+  // Keywords that suggest a link is a container for forms
+  const directoryKeywords = [
+    'forms', 'applications', 'documents', 'resources', 'packets',
+    'permits', 'contracts', 'agreements', 'manuals', 'guidelines'
+  ];
+
+  // Specific directory exclusions
+  const excludeKeywords = [
+    'login', 'signin', 'register', 'contact', 'about', 'privacy',
+    'terms', 'policy', 'javascript:', 'mailto:', 'tel:', '#'
+  ];
+
+  links.forEach(link => {
+    const href = link.href.toLowerCase();
+    const text = link.textContent.trim().toLowerCase();
+
+    // Must not be a PDF itself (those are handled by findPdfLinks)
+    if (href.includes('.pdf')) return;
+
+    const isMatch = directoryKeywords.some(kw => href.includes(kw) || text.includes(kw));
+    const isExcluded = excludeKeywords.some(kw => href.includes(kw));
+
+    if (isMatch && !isExcluded) {
+      urls.add(link.href);
+    }
+  });
+
+  // Limit to 5 most likely directories to prevent crawling entire site
+  return Array.from(urls).slice(0, 5);
+}
+
+// Perform Deep Scan (Fetch standard neighbors + Directory links)
 async function performDeepScan() {
-  const targetUrls = findPaginationLinks();
+  const paginationUrls = findPaginationLinks();
+  const directoryUrls = findDirectoryLinks();
+
+  // Combine unique URLs
+  const targetUrls = new Set([...paginationUrls, ...directoryUrls]);
   let allPdfs = [];
+
+  console.log('[Deep Scan] Targets:', targetUrls);
 
   for (const url of targetUrls) {
     try {
@@ -211,11 +253,14 @@ async function performDeepScan() {
 
         // Scan this document
         const pdfs = await findPdfLinks(doc);
+        const isDirectory = directoryUrls.includes(url);
 
         // Tag them
         pdfs.forEach(p => {
-          p.source_page = "Neighbor";
+          p.source_page = isDirectory ? "Smart Scan" : "Neighbor";
           p.badge_type = "deep-scan"; // Use distinct badge
+          // Add parent URL for context
+          p.parent_url = url;
         });
 
         allPdfs = [...allPdfs, ...pdfs];
