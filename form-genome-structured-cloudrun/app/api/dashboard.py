@@ -1,8 +1,11 @@
 # app/api/dashboard.py
 # API endpoints for the dashboard
 
-from flask import Blueprint, jsonify, request
-from app.services.storage import get_db, save_form
+from flask import Blueprint, jsonify, request, g
+from app.services.storage import get_db, save_form, create_client_batch, OpenBatchLimitExceeded
+from app.api.auth import require_client
+from app.api.batch import open_batch_limit_response, too_many_urls_response
+from app.core.config import Config
 import json
 import logging
 import time
@@ -259,6 +262,7 @@ def delete_team_forms():
 
 
 @dashboard_bp.route('/team/reanalyze', methods=['POST'])
+@require_client
 def reanalyze_team_forms():
     """Re-analyze forms by ID"""
     try:
@@ -267,6 +271,9 @@ def reanalyze_team_forms():
         
         if not analysis_ids:
             return jsonify({"ok": False, "error": "No IDs provided"}), 400
+
+        if len(analysis_ids) > Config.MAX_BATCH_URLS:
+            return too_many_urls_response("ok")
             
         ids = [int(id) for id in analysis_ids]
         
@@ -281,14 +288,19 @@ def reanalyze_team_forms():
         if not urls:
              return jsonify({"ok": False, "error": "No valid forms found for re-analysis"}), 404
 
-        from app.services.storage import add_job
-        queued_count = 0
-        for url in urls:
+        try:
             # Priority 10 for immediate re-analysis
-            add_job(url, priority=10) 
-            queued_count += 1
+            batch_id, queued_count = create_client_batch(
+                g.client_id,
+                urls,
+                Config.MAX_OPEN_BATCHES_PER_CLIENT,
+                batch_name="Dashboard re-analysis",
+                priority=10
+            )
+        except OpenBatchLimitExceeded:
+            return open_batch_limit_response("ok")
             
-        return jsonify({"ok": True, "queued_count": queued_count})
+        return jsonify({"ok": True, "queued_count": queued_count, "batch_id": batch_id})
         
     except Exception as e:
         logger.error(f"Failed to re-analyze forms: {str(e)}")

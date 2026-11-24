@@ -10,6 +10,7 @@ import requests
 import tempfile
 
 API_BASE = "http://localhost:8080"
+AUTH_HEADERS = {"Authorization": f"Bearer {os.getenv('FORMGENOME_API_TOKEN', '')}"}
 
 def test_health():
     """Test the health endpoint"""
@@ -35,7 +36,7 @@ def test_txt_upload():
     try:
         with open(temp_path, 'rb') as f:
             files = {'file': ('test_form.txt', f, 'text/plain')}
-            response = requests.post(f"{API_BASE}/api/analyze/upload", files=files)
+            response = requests.post(f"{API_BASE}/api/analyze/upload", files=files, headers=AUTH_HEADERS)
 
         print(f"Status: {response.status_code}")
         result = response.json()
@@ -70,7 +71,7 @@ def test_csv_upload():
     try:
         with open(temp_path, 'rb') as f:
             files = {'file': ('test_data.csv', f, 'text/csv')}
-            response = requests.post(f"{API_BASE}/api/analyze/upload", files=files)
+            response = requests.post(f"{API_BASE}/api/analyze/upload", files=files, headers=AUTH_HEADERS)
 
         print(f"Status: {response.status_code}")
         result = response.json()
@@ -103,7 +104,7 @@ def test_invalid_file_type():
     try:
         with open(temp_path, 'rb') as f:
             files = {'file': ('malware.exe', f, 'application/octet-stream')}
-            response = requests.post(f"{API_BASE}/api/analyze/upload", files=files)
+            response = requests.post(f"{API_BASE}/api/analyze/upload", files=files, headers=AUTH_HEADERS)
 
         print(f"Status: {response.status_code}")
         result = response.json()

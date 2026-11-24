@@ -93,6 +93,12 @@ function Set-Secret($name, $value) {
 }
 
 $DB_PASSWORD = [Environment]::GetEnvironmentVariable("DB_PASSWORD", "Process")
+$API_TOKENS = [Environment]::GetEnvironmentVariable("FORMGENOME_API_TOKENS", "Process")
+
+if ([string]::IsNullOrEmpty($API_TOKENS)) {
+    Write-Color "❌ Error: FORMGENOME_API_TOKENS (comma-separated client tokens) not found in .env file" $Red
+    exit 1
+}
 
 if ([string]::IsNullOrEmpty($DB_PASSWORD)) {
     Write-Color "❌ Error: DB_PASSWORD not found in .env file" $Red
@@ -102,6 +108,7 @@ if ([string]::IsNullOrEmpty($DB_PASSWORD)) {
 Set-Secret "DB_PASSWORD" $DB_PASSWORD
 Set-Secret "GEMINI_API_KEY" $GEMINI_KEY
 Set-Secret "ANTHROPIC_API_KEY" $ANTHROPIC_KEY
+Set-Secret "FORMGENOME_API_TOKENS" $API_TOKENS
 
 Write-Color "✅ Secrets configured" $Green
 Write-Host ""
@@ -131,7 +138,7 @@ gcloud run deploy $SERVICE_NAME `
     --port 8080 `
     --set-env-vars "FLASK_ENV=production,FLASK_DEBUG=false,DB_USER=postgres,DB_NAME=formgenome,CLOUD_SQL_CONNECTION_NAME=formgenome:us-central1:form-genome-db" `
     --add-cloudsql-instances "formgenome:us-central1:form-genome-db" `
-    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,DB_PASSWORD=DB_PASSWORD:latest"
+    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,DB_PASSWORD=DB_PASSWORD:latest,FORMGENOME_API_TOKENS=FORMGENOME_API_TOKENS:latest"
 
 Write-Host ""
 Write-Color "========================================" $Green

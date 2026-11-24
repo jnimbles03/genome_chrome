@@ -26,6 +26,14 @@ class Config:
     GEMINI_RPM = int(os.getenv("GEMINI_RPM", "60"))
     ANTHROPIC_RPM = int(os.getenv("ANTHROPIC_RPM", "50"))
 
+    # Client access. Each comma-separated token identifies one client; LLM and
+    # queue limits below are enforced per token. With no tokens configured the
+    # LLM-backed endpoints refuse every request.
+    API_TOKENS = [t.strip() for t in os.getenv("FORMGENOME_API_TOKENS", "").split(",") if t.strip()]
+    CLIENT_LLM_CALLS_PER_MINUTE = int(os.getenv("CLIENT_LLM_CALLS_PER_MINUTE", "6"))
+    MAX_BATCH_URLS = int(os.getenv("MAX_BATCH_URLS", "25"))
+    MAX_OPEN_BATCHES_PER_CLIENT = int(os.getenv("MAX_OPEN_BATCHES_PER_CLIENT", "2"))
+
     # API Keys
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

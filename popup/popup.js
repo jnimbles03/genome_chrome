@@ -123,7 +123,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Optional: Visual confirmation or reload hint
     showSuccess(`Switched to ${isNowLocal ? 'Local' : 'Cloud'} API`);
   });
+
+  document.getElementById('setApiToken').addEventListener('click', async () => {
+    const { apiToken } = await chrome.storage.local.get('apiToken');
+    const entered = prompt('Form Genome API token for this install:', apiToken || '');
+    if (entered === null) return;
+    await chrome.storage.local.set({ apiToken: entered.trim() });
+    showSuccess(entered.trim() ? 'API token saved' : 'API token cleared');
+  });
 });
+
+async function getAuthHeaders() {
+  const { apiToken } = await chrome.storage.local.get('apiToken');
+  return apiToken ? { 'Authorization': `Bearer ${apiToken}` } : {};
+}
+
+function analysisErrorMessage(response, errData) {
+  if (response.status === 401) {
+    return 'API token missing or invalid. Click 🔑 Token to set it.';
+  }
+  if (response.status === 429) {
+    return (errData && errData.error) || 'Analysis rate limit reached. Try again in a minute.';
+  }
+  return (errData && errData.error) || `Analysis failed: ${response.statusText}`;
+}
 
 function showNoPdf() {
   document.getElementById('noPdf').classList.remove('hidden');
@@ -353,16 +376,17 @@ async function analyzePdf(pdfUrl, asUrl = false) {
   console.log('[FORM GENOME] Starting analysis for:', pdfUrl, asUrl ? '(as URL)' : '(as File)');
 
   const apiUrl = `${CONFIG.API_URL}${CONFIG.ANALYZE_ENDPOINT}`;
+  const authHeaders = await getAuthHeaders();
 
   if (asUrl) {
     const response = await fetch(apiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ url: pdfUrl })
     });
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || `Analysis failed: ${response.statusText}`);
+      throw new Error(analysisErrorMessage(response, errData));
     }
     const data = await response.json();
     return data.results || data;
@@ -380,11 +404,13 @@ async function analyzePdf(pdfUrl, asUrl = false) {
 
   const analysisResponse = await fetch(apiUrl, {
     method: 'POST',
+    headers: authHeaders,
     body: formData
   });
 
   if (!analysisResponse.ok) {
-    throw new Error(`Analysis failed: ${analysisResponse.statusText}`);
+    const errData = await analysisResponse.json().catch(() => ({}));
+    throw new Error(analysisErrorMessage(analysisResponse, errData));
   }
 
   const data = await analysisResponse.json();
@@ -551,8 +577,12 @@ async function handleClearCache() {
     return;
   }
 
-  // Clear all storage
+  // Clear all storage except the install's API token
+  const { apiToken } = await chrome.storage.local.get('apiToken');
   await chrome.storage.local.clear();
+  if (apiToken) {
+    await chrome.storage.local.set({ apiToken });
+  }
   analysisCache = {};
 
   console.log('[FORM GENOME] Cache cleared! analysisCache is now empty:', analysisCache);

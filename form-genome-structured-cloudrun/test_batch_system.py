@@ -210,6 +210,11 @@ def test_llm_routing_with_rate_limiting():
         return False
 
 
+def _auth_headers():
+    tokens = [t.strip() for t in os.getenv("FORMGENOME_API_TOKENS", "").split(",") if t.strip()]
+    return {"Authorization": f"Bearer {tokens[0]}"} if tokens else {}
+
+
 def test_api_endpoints():
     """Test 6: API endpoints"""
     print("\n" + "=" * 60)
@@ -245,6 +250,7 @@ def test_api_endpoints():
                 ],
                 "name": "API Test Batch"
             },
+            headers=_auth_headers(),
             content_type='application/json'
         )
 

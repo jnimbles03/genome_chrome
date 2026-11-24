@@ -1,7 +1,7 @@
 # app/api/analyze.py
 # API endpoint for single file upload and analysis
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from werkzeug.utils import secure_filename
 import os
 import logging
@@ -17,11 +17,12 @@ except ImportError:
 
 # LLM services
 from app.services.title_llm import normalize_form_title, enforce_entity_consistency
-from app.services.llm_router import chat_complete, LLMError
+from app.services.llm_router import chat_complete, LLMError, client_llm_budget
 from app.services.prompts import (
     SCOUT_SYSTEM_PROMPT, SCOUT_USER_PROMPT,
     ANALYST_SYSTEM_PROMPT, ANALYST_USER_PROMPT
 )
+from app.api.auth import require_client
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,10 @@ analyze_bp = Blueprint('analyze', __name__, url_prefix='/api/analyze')
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {'pdf', 'txt', 'csv'}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+# Scout + Deep. A Gemini fallback after a failed Deep call is charged only if
+# the client still has budget left.
+LLM_CALLS_PER_PDF_ANALYSIS = 2
 
 def allowed_file(filename: str) -> bool:
     """Check if file extension is allowed"""
@@ -472,7 +477,55 @@ def analyze_csv_file(file_path: str, filename: str) -> Dict[str, Any]:
 # API Endpoints
 # =============================================================================
 
+def _analyze_uploaded_file(file, filename: str, file_ext: str, file_size: int, source_url):
+    # Save file to temporary location
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_ext}') as temp_file:
+        temp_path = temp_file.name
+        file.save(temp_path)
+
+    try:
+        # Analyze based on file type
+        if file_ext == 'pdf':
+            results = analyze_pdf_file(temp_path, filename, url=source_url)
+        elif file_ext == 'txt':
+            results = analyze_txt_file(temp_path, filename)
+        elif file_ext == 'csv':
+            results = analyze_csv_file(temp_path, filename)
+        else:
+            results = {
+                "error": "Unsupported file type",
+                "fileName": filename,
+                "success": False
+            }
+
+        # Add file size to results
+        results['fileSize'] = file_size
+
+        return jsonify({
+            "success": results.get('success', True),
+            "results": results
+        })
+
+    finally:
+        # Clean up temporary file
+        try:
+            os.unlink(temp_path)
+        except Exception as e:
+            logger.warning(f"Failed to delete temp file: {str(e)}")
+
+
+def _llm_budget_exhausted():
+    response = jsonify({
+        "success": False,
+        "error": "LLM analysis rate limit exceeded for this client. Try again later."
+    })
+    response.status_code = 429
+    response.headers["Retry-After"] = "60"
+    return response
+
+
 @analyze_bp.route('/upload', methods=['POST'])
+@require_client
 def upload_file():
     """
     Upload and analyze a file (PDF, TXT, or CSV).
@@ -498,18 +551,21 @@ def upload_file():
         # Check if URL is provided instead of file
         if request.is_json and 'url' in request.json:
             url = request.json['url']
-            logger.info(f"Analyzing URL: {url}")
-            try:
-                results = analyze_url_logic(url)
-                return jsonify({
-                    "success": True,
-                    "results": results
-                })
-            except Exception as e:
-                return jsonify({
-                    "success": False,
-                    "error": str(e)
-                }), 400
+            with client_llm_budget(g.client_id, LLM_CALLS_PER_PDF_ANALYSIS) as admitted:
+                if not admitted:
+                    return _llm_budget_exhausted()
+                logger.info(f"Analyzing URL: {url}")
+                try:
+                    results = analyze_url_logic(url)
+                    return jsonify({
+                        "success": True,
+                        "results": results
+                    })
+                except Exception as e:
+                    return jsonify({
+                        "success": False,
+                        "error": str(e)
+                    }), 400
 
         if 'file' not in request.files:
             return jsonify({
@@ -550,43 +606,15 @@ def upload_file():
                 "error": f"File size exceeds {MAX_FILE_SIZE / (1024*1024):.0f}MB limit"
             }), 400
 
-        # Save file to temporary location
         filename = secure_filename(file.filename)
         file_ext = filename.rsplit('.', 1)[1].lower()
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_ext}') as temp_file:
-            temp_path = temp_file.name
-            file.save(temp_path)
-
-        try:
-            # Analyze based on file type
-            if file_ext == 'pdf':
-                results = analyze_pdf_file(temp_path, filename, url=source_url)
-            elif file_ext == 'txt':
-                results = analyze_txt_file(temp_path, filename)
-            elif file_ext == 'csv':
-                results = analyze_csv_file(temp_path, filename)
-            else:
-                results = {
-                    "error": "Unsupported file type",
-                    "fileName": filename,
-                    "success": False
-                }
-
-            # Add file size to results
-            results['fileSize'] = file_size
-
-            return jsonify({
-                "success": results.get('success', True),
-                "results": results
-            })
-
-        finally:
-            # Clean up temporary file
-            try:
-                os.unlink(temp_path)
-            except Exception as e:
-                logger.warning(f"Failed to delete temp file: {str(e)}")
+        if file_ext == 'pdf':
+            with client_llm_budget(g.client_id, LLM_CALLS_PER_PDF_ANALYSIS) as admitted:
+                if not admitted:
+                    return _llm_budget_exhausted()
+                return _analyze_uploaded_file(file, filename, file_ext, file_size, source_url)
+        return _analyze_uploaded_file(file, filename, file_ext, file_size, source_url)
 
     except Exception as e:
         logger.error(f"File upload failed: {str(e)}")
