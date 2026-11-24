@@ -579,6 +579,24 @@
       }
     }
 
+    const API_TOKEN_KEY = 'formGenomeApiToken';
+
+    function apiAuthHeaders() {
+      let token = localStorage.getItem(API_TOKEN_KEY);
+      if (!token) {
+        token = (prompt('Form Genome API token:') || '').trim();
+        if (token) localStorage.setItem(API_TOKEN_KEY, token);
+      }
+      return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+
+    function checkAuth(response) {
+      if (response.status === 401) {
+        localStorage.removeItem(API_TOKEN_KEY);
+        throw new Error('API token missing or invalid');
+      }
+    }
+
     // File upload handler
     document.getElementById('fileInput').addEventListener('change', async (e) => {
       const files = e.target.files;
@@ -604,8 +622,10 @@
         try {
           const response = await fetch('/api/analyze/upload', {
             method: 'POST',
+            headers: apiAuthHeaders(),
             body: formData
           });
+          checkAuth(response);
 
           const result = await response.json();
 
@@ -660,7 +680,8 @@
         const createResponse = await fetch('/api/batch/create', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...apiAuthHeaders()
           },
           body: JSON.stringify({
             url: url,
@@ -668,6 +689,7 @@
             name: `Scan of ${new URL(url).hostname}`
           })
         });
+        checkAuth(createResponse);
 
         if (!createResponse.ok) {
           throw new Error(`Failed to create batch: ${createResponse.statusText}`);

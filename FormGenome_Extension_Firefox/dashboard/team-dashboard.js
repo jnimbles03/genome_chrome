@@ -941,12 +941,22 @@ async function handleBulkReanalyze() {
 
   try {
     const ids = Array.from(selectedFormIds);
+    let { apiToken } = await browser.storage.local.get('apiToken');
+    if (!apiToken) {
+      apiToken = (prompt('Form Genome API token for this install:') || '').trim();
+      if (!apiToken) return;
+      await browser.storage.local.set({ apiToken });
+    }
     const response = await fetch(`${API_BASE_URL}/api/team/reanalyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
       body: JSON.stringify({ analysis_ids: ids })
     });
 
+    if (response.status === 401) {
+      await browser.storage.local.remove('apiToken');
+      throw new Error('API token missing or invalid');
+    }
     const data = await response.json();
     if (data.ok) {
       selectedFormIds.clear();
