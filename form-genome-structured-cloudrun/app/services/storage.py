@@ -497,26 +497,95 @@ def get_recent_batches(limit: int = 10) -> List[Dict]:
 # Form Storage Operations
 # =============================================================================
 
-def save_form(url: str, title: str, entity_name: Optional[str], complexity: int, metadata: Optional[Dict] = None):
-    """Save analyzed form to database"""
+class FormOwnershipError(Exception):
+    """The form row belongs to a different user (or to no user)."""
+
+
+def parse_form_metadata(raw) -> Dict:
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def form_owner(raw_metadata) -> Optional[str]:
+    """The owning user id of a form row (metadata.user_id), or None."""
+    owner = parse_form_metadata(raw_metadata).get('user_id')
+    return owner if isinstance(owner, str) and owner else None
+
+
+def _write_form(url: str, title: str, entity_name: Optional[str], complexity: int,
+                metadata: Optional[Dict], owner: Optional[str]) -> int:
+    """
+    Insert a form row, or update the existing row for this URL while holding
+    its row lock. With `owner`, the existing row must belong to that owner.
+    Without `owner`, an existing row keeps its current owner.
+    """
     url_hash = hashlib.md5(url.encode()).hexdigest()
+    metadata = dict(metadata or {})
+    if owner is not None:
+        metadata['user_id'] = owner
 
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO forms (url, url_hash, title, entity_name, complexity, status, analyzed_at, updated_at, metadata)
-            VALUES (%s, %s, %s, %s, %s, 'completed', %s, %s, %s)
-            ON CONFLICT (url_hash) DO UPDATE SET
-                title = EXCLUDED.title,
-                entity_name = EXCLUDED.entity_name,
-                complexity = EXCLUDED.complexity,
-                status = EXCLUDED.status,
-                analyzed_at = EXCLUDED.analyzed_at,
-                updated_at = EXCLUDED.updated_at,
-                metadata = EXCLUDED.metadata
-        """, (url, url_hash, title, entity_name, complexity, int(time.time()), int(time.time()), json.dumps(metadata) if metadata else None))
+        # The row can be deleted between the INSERT and the SELECT; retry then.
+        for _ in range(3):
+            now = int(time.time())
+            cursor.execute("""
+                INSERT INTO forms (url, url_hash, title, entity_name, complexity, status, analyzed_at, updated_at, metadata)
+                VALUES (%s, %s, %s, %s, %s, 'completed', %s, %s, %s)
+                ON CONFLICT DO NOTHING
+                RETURNING id
+            """, (url, url_hash, title, entity_name, complexity, now, now, json.dumps(metadata) if metadata else None))
+            inserted = cursor.fetchone()
+            if inserted:
+                logger.info(f"Saved form: {title} ({url})")
+                return inserted['id']
 
-        logger.info(f"Saved form: {title} ({url})")
+            cursor.execute("SELECT id, metadata FROM forms WHERE url_hash = %s FOR UPDATE", (url_hash,))
+            existing = cursor.fetchone()
+            if existing is None:
+                continue
+
+            existing_owner = form_owner(existing['metadata'])
+            if owner is not None:
+                if existing_owner != owner:
+                    raise FormOwnershipError(f"form {existing['id']} is not owned by the caller")
+            elif existing_owner is not None:
+                metadata['user_id'] = existing_owner
+
+            cursor.execute("""
+                UPDATE forms SET
+                    title = %s, entity_name = %s, complexity = %s, status = 'completed',
+                    analyzed_at = %s, updated_at = %s, metadata = %s
+                WHERE id = %s
+            """, (title, entity_name, complexity, now, now,
+                  json.dumps(metadata) if metadata else None, existing['id']))
+            logger.info(f"Saved form: {title} ({url})")
+            return existing['id']
+
+        raise RuntimeError(f"Could not save form {url}: row changed concurrently")
+
+
+def save_form(url: str, title: str, entity_name: Optional[str], complexity: int, metadata: Optional[Dict] = None) -> int:
+    """Save analyzed form to database. An existing row keeps its owner."""
+    return _write_form(url, title, entity_name, complexity, metadata, owner=None)
+
+
+def save_owned_form(url: str, title: str, entity_name: Optional[str], complexity: int,
+                    metadata: Optional[Dict], owner: str) -> int:
+    """
+    Save a form on behalf of `owner`. Raises FormOwnershipError if the URL is
+    already stored for anyone else.
+    """
+    if not owner:
+        raise ValueError("owner is required")
+    return _write_form(url, title, entity_name, complexity, metadata, owner=owner)
 
 
 def get_form(url: str) -> Optional[Dict]:

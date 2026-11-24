@@ -1,8 +1,11 @@
 # app/api/dashboard.py
 # API endpoints for the dashboard
 
-from flask import Blueprint, jsonify, request
-from app.services.storage import get_db, save_form
+from flask import Blueprint, current_app, g, jsonify, request
+from app.api.team_auth import TeamAuthError, TeamAuthNotConfigured, bearer_token, verify_token
+from app.services.storage import (
+    FormOwnershipError, form_owner, get_db, parse_form_metadata, save_owned_form
+)
 import json
 import logging
 import time
@@ -10,6 +13,40 @@ import time
 logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
+
+
+@dashboard_bp.before_request
+def require_team_identity():
+    """Every team route requires a valid bearer token; see app/api/team_auth.py."""
+    if request.method == 'OPTIONS':
+        return None
+    try:
+        g.team_identity = verify_token(
+            bearer_token(request.headers.get('Authorization')),
+            current_app.config.get('SECRET_KEY'),
+        )
+    except TeamAuthNotConfigured:
+        logger.error("Team API rejected request: SECRET_KEY is unset or insecure")
+        return jsonify({"ok": False, "error": "Team API authentication is not configured"}), 503
+    except TeamAuthError as e:
+        logger.info(f"Team API rejected request: {e}")
+        return jsonify({"ok": False, "error": "Authentication required"}), 401
+    return None
+
+
+def _require_admin():
+    if g.team_identity['role'] != 'admin':
+        return jsonify({"ok": False, "error": "Admin role required"}), 403
+    return None
+
+
+def _parse_ids(raw_ids):
+    if not isinstance(raw_ids, list):
+        return None
+    try:
+        return [int(i) for i in raw_ids]
+    except (TypeError, ValueError):
+        return None
 
 @dashboard_bp.route('/records_unique', methods=['GET'])
 @dashboard_bp.route('/team/forms', methods=['GET'])
@@ -120,11 +157,11 @@ def sync_team_form():
     Upserts the form record in the database.
     """
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         form_data = data.get('form_data')
-        user_id = data.get('user_id')
+        user_id = g.team_identity['sub']
         
-        if not form_data:
+        if not form_data or not isinstance(form_data, dict):
             return jsonify({"ok": False, "error": "Missing form_data"}), 400
 
         # Extract core fields
@@ -143,8 +180,11 @@ def sync_team_form():
         metadata = form_data.copy()
         metadata['user_id'] = user_id
         
-        # Save to DB (Upsert)
-        save_form(url, title, entity_name, complexity, metadata)
+        # Save to DB (Upsert); refuses rows stored for another user
+        try:
+            save_owned_form(url, title, entity_name, complexity, metadata, owner=user_id)
+        except FormOwnershipError:
+            return jsonify({"ok": False, "error": "This form was synced by another user"}), 403
         
         return jsonify({"ok": True, "message": "Form synced successfully"})
 
@@ -159,36 +199,34 @@ def update_team_form():
     Update a form record directly from the dashboard.
     """
     try:
-        data = request.json
-        analysis_id = data.get('analysis_id')
+        data = request.get_json(silent=True) or {}
         form_data = data.get('form_data')
+        ids = _parse_ids([data.get('analysis_id')])
         
-        if not analysis_id or not form_data:
+        if not ids or not form_data or not isinstance(form_data, dict):
             return jsonify({"ok": False, "error": "Missing analysis_id or form_data"}), 400
 
         with get_db() as conn:
             cursor = conn.cursor()
             
-            # Fetch existing metadata first
-            cursor.execute("SELECT metadata FROM forms WHERE id = %s", (analysis_id,))
+            # Lock the row so its owner cannot change before the UPDATEs below
+            cursor.execute("SELECT id, metadata FROM forms WHERE id = %s FOR UPDATE", (ids[0],))
             row = cursor.fetchone()
             if not row:
                 return jsonify({"ok": False, "error": "Form not found"}), 404
-                
-            current_meta = {}
-            if row['metadata']:
-                try:
-                    current_meta = json.loads(row['metadata']) if isinstance(row['metadata'], str) else row['metadata']
-                except:
-                    pass
+            if form_owner(row['metadata']) != g.team_identity['sub']:
+                return jsonify({"ok": False, "error": "You can only update forms you synced"}), 403
+
+            form_id = row['id']
+            current_meta = parse_form_metadata(row['metadata'])
             
             # Update specific top-level columns
             if 'form_name' in form_data:
-                cursor.execute("UPDATE forms SET title = %s WHERE id = %s", (form_data['form_name'], analysis_id))
+                cursor.execute("UPDATE forms SET title = %s WHERE id = %s", (form_data['form_name'], form_id))
             if 'entity_name' in form_data:
-                cursor.execute("UPDATE forms SET entity_name = %s WHERE id = %s", (form_data['entity_name'], analysis_id))
+                cursor.execute("UPDATE forms SET entity_name = %s WHERE id = %s", (form_data['entity_name'], form_id))
             if 'complexity_score' in form_data:
-                cursor.execute("UPDATE forms SET complexity = %s WHERE id = %s", (form_data['complexity_score'], analysis_id))
+                cursor.execute("UPDATE forms SET complexity = %s WHERE id = %s", (form_data['complexity_score'], form_id))
                 
             # Update metadata fields
             # We map the flat form_data back to the metadata structure
@@ -224,7 +262,7 @@ def update_team_form():
             
             # Save updated metadata
             cursor.execute("UPDATE forms SET metadata = %s, updated_at = %s WHERE id = %s", 
-                          (json.dumps(current_meta), int(time.time()), analysis_id))
+                          (json.dumps(current_meta), int(time.time()), form_id))
             
             conn.commit()
             
@@ -237,16 +275,16 @@ def update_team_form():
 
 @dashboard_bp.route('/team/delete', methods=['POST'])
 def delete_team_forms():
-    """Delete forms by ID"""
+    """Delete forms by ID (admin only)"""
+    denied = _require_admin()
+    if denied:
+        return denied
     try:
-        data = request.json
-        analysis_ids = data.get('analysis_ids', [])
+        data = request.get_json(silent=True) or {}
+        ids = _parse_ids(data.get('analysis_ids', []))
         
-        if not analysis_ids:
+        if not ids:
             return jsonify({"ok": False, "error": "No IDs provided"}), 400
-            
-        # Convert to integers
-        ids = [int(id) for id in analysis_ids]
         
         from app.services.storage import delete_forms
         count = delete_forms(ids)
@@ -260,15 +298,16 @@ def delete_team_forms():
 
 @dashboard_bp.route('/team/reanalyze', methods=['POST'])
 def reanalyze_team_forms():
-    """Re-analyze forms by ID"""
+    """Re-analyze forms by ID (admin only)"""
+    denied = _require_admin()
+    if denied:
+        return denied
     try:
-        data = request.json
-        analysis_ids = data.get('analysis_ids', [])
+        data = request.get_json(silent=True) or {}
+        ids = _parse_ids(data.get('analysis_ids', []))
         
-        if not analysis_ids:
+        if not ids:
             return jsonify({"ok": False, "error": "No IDs provided"}), 400
-            
-        ids = [int(id) for id in analysis_ids]
         
         with get_db() as conn:
             cursor = conn.cursor()
