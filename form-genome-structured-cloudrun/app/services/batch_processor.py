@@ -7,7 +7,6 @@ import sys
 import time
 import logging
 import threading
-import requests
 import hashlib
 from io import BytesIO
 from typing import Optional, Dict, Any, List
@@ -32,6 +31,7 @@ from app.services.storage import (
 )
 from app.services.title_llm import make_title
 from app.services.llm_router import LLMError
+from app.services.safe_fetch import safe_get, ResponseTooLargeError
 
 logger = logging.getLogger(__name__)
 
@@ -159,25 +159,16 @@ def download_pdf(url: str, timeout: float = 30.0, max_size: int = 50*1024*1024) 
     }
 
     logger.info(f"Downloading PDF: {url}")
-    response = requests.get(url, headers=headers, timeout=timeout, stream=True)
-    response.raise_for_status()
+    try:
+        response = safe_get(url, headers=headers, timeout=timeout, max_bytes=max_size)
+    except ResponseTooLargeError as e:
+        raise ValueError(f"PDF too large: {e}") from e
+    if response.status_code == 404:
+        raise Exception("404 Not Found")
+    if not response.ok:
+        raise Exception(f"HTTP {response.status_code}")
 
-    # Check content length
-    content_length = response.headers.get('content-length')
-    if content_length and int(content_length) > max_size:
-        raise ValueError(f"PDF too large: {int(content_length)} bytes (max {max_size})")
-
-    # Download with size limit
-    content = BytesIO()
-    downloaded = 0
-    for chunk in response.iter_content(chunk_size=8192):
-        if chunk:
-            downloaded += len(chunk)
-            if downloaded > max_size:
-                raise ValueError(f"PDF too large: >{max_size} bytes")
-            content.write(chunk)
-
-    pdf_bytes = content.getvalue()
+    pdf_bytes = response.content
     logger.info(f"Downloaded PDF: {len(pdf_bytes)} bytes")
     return pdf_bytes
 

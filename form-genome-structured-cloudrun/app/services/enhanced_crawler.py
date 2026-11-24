@@ -4,13 +4,43 @@ import hashlib
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode
 import xml.etree.ElementTree as ET
 
-import requests
 from urllib3.util.retry import Retry
-from requests.adapters import HTTPAdapter
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
+from app.services.safe_fetch import FetchError, safe_request, validate_url
+
 __all__ = ["EnhancedWebCrawler"]
+
+# Chromium must never open its own sockets: every request it makes is answered
+# by _route_via_safe_fetch. Anything the router cannot see (WebSockets,
+# preconnects) is sent to a proxy name that cannot resolve and is dropped.
+_BROWSER_BLOCKED_PROXY = "http://blocked.invalid:9"
+_BROWSER_ARGS = ["--host-resolver-rules=MAP * ~NOTFOUND", "--proxy-bypass-list=<-loopback>"]
+_BROWSER_SKIP_RESOURCES = ("image", "media", "font")
+_STRIP_REQUEST_HEADERS = ("host", "connection", "content-length", "accept-encoding")
+_STRIP_RESPONSE_HEADERS = ("content-encoding", "content-length", "transfer-encoding", "connection")
+MAX_FETCH_BYTES = 50 * 1024 * 1024
+
+
+class _PinnedSession:
+    """The subset of requests.Session the crawler uses, backed by safe_fetch."""
+
+    def __init__(self, headers: dict, retry: Retry, max_bytes: int = MAX_FETCH_BYTES):
+        self.headers = dict(headers)
+        self.retry = retry
+        self.max_bytes = max_bytes
+
+    def request(self, method, url, timeout=None, allow_redirects=True, headers=None, data=None):
+        merged = {**self.headers, **(headers or {})}
+        return safe_request(method, url, headers=merged, timeout=timeout, max_bytes=self.max_bytes,
+                            allow_redirects=allow_redirects, body=data, retries=self.retry)
+
+    def get(self, url, timeout=None, allow_redirects=True):
+        return self.request("GET", url, timeout=timeout, allow_redirects=allow_redirects)
+
+    def head(self, url, timeout=None, allow_redirects=False):
+        return self.request("HEAD", url, timeout=timeout, allow_redirects=allow_redirects)
 
 CRAWLER_MARKER = "full-2025-09-06"
 CRAWLER_SHA = "0f"
@@ -58,21 +88,16 @@ class EnhancedWebCrawler:
     def __init__(self, config: dict | None = None):
         self.config = {**DEFAULT_CFG, **(config or {})}
 
-        # requests session with retries
-        self.session = requests.Session()
         retry = Retry(
             total=3, connect=3, read=3, backoff_factor=0.5,
             status_forcelist=(429, 500, 502, 503, 504),
-            allowed_methods=False,
+            allowed_methods=False, raise_on_status=False,
         )
-        adapter = HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=32)
-        self.session.mount("http://", adapter)
-        self.session.mount("https://", adapter)
-        self.session.headers.update({
+        self.session = _PinnedSession({
             "User-Agent": self.config["user_agent"],
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
-        })
+        }, retry)
 
         self.seen_pages: set[str] = set()
         self.found_pdfs: dict[str, dict] = {}
@@ -117,7 +142,7 @@ class EnhancedWebCrawler:
         self._wait_per_host(host)
         try:
             r = self.session.get(url, timeout=(self.config["timeout"], self.config["read_timeout"]))
-        except requests.RequestException as e:
+        except FetchError as e:
             print(f"[crawler] GET failed {url}: {e}")
             return
 
@@ -183,7 +208,7 @@ class EnhancedWebCrawler:
                     g = self.session.get(h.url, timeout=(self.config["timeout"], self.config["read_timeout"]))
                     if g.ok:
                         self._record_pdf(h.url, g.content, hct, referrer=url)
-            except requests.RequestException as e:
+            except FetchError as e:
                 print(f"[crawler] HEAD/GET failed {L}: {e}")
                 continue
 
@@ -210,17 +235,46 @@ class EnhancedWebCrawler:
                 break
             self._crawl_recursive(child, depth + 1, max_depth, max_pages)
 
+    def _route_via_safe_fetch(self, route):
+        req = route.request
+        try:
+            if req.resource_type in _BROWSER_SKIP_RESOURCES:
+                route.abort("blockedbyclient")
+                return
+            headers = {k: v for k, v in req.headers.items() if k.lower() not in _STRIP_REQUEST_HEADERS}
+            r = self.session.request(
+                req.method, req.url, headers=headers, data=req.post_data_buffer,
+                timeout=(self.config["timeout"], self.config["read_timeout"]),
+            )
+            resp_headers = {k: v for k, v in r.headers.items() if k.lower() not in _STRIP_RESPONSE_HEADERS}
+            route.fulfill(status=r.status_code, headers=resp_headers, body=r.content)
+        except Exception as e:
+            print(f"[crawler] browser request refused {req.url}: {e}")
+            try:
+                route.abort("blockedbyclient")
+            except Exception:
+                pass
+
     def _harvest_via_playwright(self, page_url: str):
+        try:
+            validate_url(page_url)
+        except FetchError as e:
+            print(f"[crawler] Playwright skipped for {page_url}: {e}")
+            return
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
                     headless=True,
-                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-software-rasterizer"],
+                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-software-rasterizer",
+                          *_BROWSER_ARGS],
+                    proxy={"server": _BROWSER_BLOCKED_PROXY, "bypass": "<-loopback>"},
                 )
                 ctx = browser.new_context(
                     user_agent=self.session.headers.get("User-Agent", DEFAULT_CFG["user_agent"]),
                     ignore_https_errors=True,
+                    service_workers="block",
                 )
+                ctx.route("**/*", self._route_via_safe_fetch)
                 page = ctx.new_page()
                 pdf_hits = []
 
@@ -315,7 +369,7 @@ class EnhancedWebCrawler:
                 for line in r.text.splitlines():
                     if line.lower().startswith("sitemap:"):
                         sitemaps.append(line.split(":", 1)[1].strip())
-        except requests.RequestException:
+        except FetchError:
             pass
         for guess in ("/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml"):
             try:
@@ -323,7 +377,7 @@ class EnhancedWebCrawler:
                 g = self.session.get(u, timeout=(self.config["timeout"], self.config["read_timeout"]))
                 if g.ok and ("<urlset" in g.text or "<sitemapindex" in g.text):
                     sitemaps.append(u)
-            except requests.RequestException:
+            except FetchError:
                 pass
         return list(dict.fromkeys(sitemaps))
 
