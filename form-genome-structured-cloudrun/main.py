@@ -34,10 +34,19 @@ def create_app():
 
     # Configuration
     app.config['DEBUG'] = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+    # Also the signing key for team API tokens; without it /api/team/* returns 503.
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
-    # Enable CORS for API access
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Enable CORS for API access. Team routes only answer the extension origins
+    # (TEAM_API_ALLOWED_ORIGINS, comma-separated, overrides the default).
+    team_origins = [o.strip() for o in os.getenv('TEAM_API_ALLOWED_ORIGINS', '').split(',') if o.strip()]
+    if not team_origins:
+        team_origins = [r"^chrome-extension://[a-p]{32}$", r"^moz-extension://[0-9a-fA-F-]{36}$"]
+    CORS(app, resources={
+        r"/api/team/*": {"origins": team_origins},
+        r"/api/records_unique": {"origins": team_origins},
+        r"/api/*": {"origins": "*"},
+    })
 
     # Register APIs
     # Register APIs

@@ -70,7 +70,8 @@ gcloud run deploy ${SERVICE_NAME} \
     --min-instances 0 \
     --port 8080 \
     --set-env-vars "FLASK_ENV=production" \
-    --set-env-vars "FLASK_DEBUG=false"
+    --set-env-vars "FLASK_DEBUG=false" \
+    --set-secrets "SECRET_KEY=FORM_GENOME_SECRET_KEY:latest"
 
 # Note: For secrets, add these flags:
 # --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest" \

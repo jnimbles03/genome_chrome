@@ -55,7 +55,8 @@ async function syncAnalysisResults() {
                value &&
                !value.error &&
                value.ok &&
-               !value._synced;
+               !value._synced &&
+               !value._sync_rejected;
       })
       .map(([key, value]) => ({ key, data: value }));
 
@@ -66,6 +67,11 @@ async function syncAnalysisResults() {
     }
 
     console.log(`[SYNC] Found ${unsyncedForms.length} unsynced forms`);
+
+    if (!(await getTeamApiToken())) {
+      console.log('[SYNC] No team API token set; open the Team Dashboard to add one');
+      return;
+    }
 
     // Sync in batches
     for (let i = 0; i < unsyncedForms.length; i += SYNC_BATCH_SIZE) {
@@ -84,6 +90,7 @@ async function syncAnalysisResults() {
 async function syncBatch(batch) {
   // Get user identifier (we'll use Chrome's sync storage for user ID)
   let userId = await getUserIdentifier();
+  const authHeaders = await getTeamAuthHeaders();
 
   for (const { key, data } of batch) {
     try {
@@ -126,7 +133,8 @@ async function syncBatch(batch) {
       const response = await fetch(`${API_BASE_URL}/api/team/sync`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...authHeaders
         },
         body: JSON.stringify(payload)
       });
@@ -136,6 +144,10 @@ async function syncBatch(batch) {
         const updatedData = { ...data, _synced: true, _synced_at: Date.now() };
         await chrome.storage.local.set({ [key]: updatedData });
         console.log(`[SYNC] Synced ${key}`);
+      } else if (response.status === 403) {
+        // Another user already synced this source URL; don't retry it
+        await chrome.storage.local.set({ [key]: { ...data, _sync_rejected: true } });
+        console.warn(`[SYNC] ${key} was already synced by another user`);
       } else {
         console.error(`[SYNC] Failed to sync ${key}:`, response.status, response.statusText);
       }
