@@ -1,10 +1,13 @@
 
 import os
+import sys
 import google.generativeai as genai_old
 from google import genai
 from google.genai import types
 
-api_key = "AIzaSyDlCklqbmI6MKayoufnf36GpNzp67swbkA"
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    sys.exit("GEMINI_API_KEY is not set")
 
 print("-" * 50)
 print("Testing google-genai (New SDK) with gemini-2.5-flash...")
