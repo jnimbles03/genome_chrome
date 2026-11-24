@@ -7,6 +7,8 @@ import time
 import json
 import logging
 import threading
+import contextvars
+from contextlib import contextmanager
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from collections import deque
@@ -85,6 +87,69 @@ class APIRateLimiter:
 
 
 # -----------------------------------------------------------------------------
+# Per-client LLM Budget
+# -----------------------------------------------------------------------------
+class ClientLLMBudget:
+    """Sliding-window cap on LLM provider calls per authenticated client.
+
+    A request reserves the calls it needs up front; each provider call is then
+    charged against that reservation, and unused slots are released when the
+    request ends. Reservations count against the window while held, so
+    concurrent requests from one client cannot together exceed the cap.
+    """
+
+    def __init__(self, calls_per_minute: int, window_seconds: float = 60.0):
+        self.calls_per_minute = calls_per_minute
+        self.window_seconds = window_seconds
+        self._calls: Dict[str, deque] = {}
+        self._held: Dict[str, int] = {}
+        self._lock = threading.Lock()
+
+    def _used(self, client_id: str, now: float) -> int:
+        calls = self._calls.setdefault(client_id, deque())
+        while calls and now - calls[0] > self.window_seconds:
+            calls.popleft()
+        return len(calls) + self._held.get(client_id, 0)
+
+    def reserve(self, client_id: str, calls: int) -> Optional["LLMReservation"]:
+        with self._lock:
+            if self._used(client_id, time.time()) + calls > self.calls_per_minute:
+                return None
+            self._held[client_id] = self._held.get(client_id, 0) + calls
+            return LLMReservation(self, client_id, calls)
+
+    def _charge(self, reservation: "LLMReservation") -> bool:
+        with self._lock:
+            now = time.time()
+            client_id = reservation.client_id
+            if reservation.remaining > 0:
+                reservation.remaining -= 1
+                self._held[client_id] -= 1
+            elif self._used(client_id, now) >= self.calls_per_minute:
+                return False
+            self._calls.setdefault(client_id, deque()).append(now)
+            return True
+
+    def _release(self, reservation: "LLMReservation") -> None:
+        with self._lock:
+            self._held[reservation.client_id] -= reservation.remaining
+            reservation.remaining = 0
+
+
+class LLMReservation:
+    def __init__(self, budget: ClientLLMBudget, client_id: str, calls: int):
+        self.budget = budget
+        self.client_id = client_id
+        self.remaining = calls
+
+    def charge(self) -> bool:
+        return self.budget._charge(self)
+
+    def release(self) -> None:
+        self.budget._release(self)
+
+
+# -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
 @dataclass
@@ -160,6 +225,56 @@ def _get_anthropic_rate_limiter(config: LLMConfig) -> Optional[APIRateLimiter]:
             _anthropic_rate_limiter = APIRateLimiter(config.anthropic_rpm)
             logger.info(f"Initialized Anthropic rate limiter: {config.anthropic_rpm} req/min")
         return _anthropic_rate_limiter
+
+
+_client_budget: Optional[ClientLLMBudget] = None
+_active_reservation: contextvars.ContextVar[Optional[LLMReservation]] = contextvars.ContextVar(
+    "llm_active_reservation", default=None
+)
+
+
+def _get_client_budget() -> ClientLLMBudget:
+    global _client_budget
+    from app.core.config import Config
+    with _rate_limiter_lock:
+        if _client_budget is None:
+            _client_budget = ClientLLMBudget(Config.CLIENT_LLM_CALLS_PER_MINUTE)
+        return _client_budget
+
+
+@contextmanager
+def client_llm_budget(client_id: str, calls: int):
+    """Reserve ``calls`` LLM calls for ``client_id`` and bind them to this context.
+
+    Yields False (binding nothing) when the client's budget cannot cover the
+    reservation. Every chat_complete call made inside the block is charged to
+    this reservation; unused slots are released on exit.
+    """
+    reservation = _get_client_budget().reserve(client_id, calls)
+    if reservation is None:
+        yield False
+        return
+    token = _active_reservation.set(reservation)
+    try:
+        yield True
+    finally:
+        _active_reservation.reset(token)
+        reservation.release()
+
+
+def _charge_client_budget() -> None:
+    reservation = _active_reservation.get()
+    if reservation is not None:
+        if not reservation.charge():
+            raise LLMError("Per-client LLM budget exhausted")
+        return
+    try:
+        from flask import has_request_context
+    except ImportError:
+        return
+    if has_request_context():
+        # HTTP handlers must bind a client reservation before reaching the LLM.
+        raise LLMError("LLM call from a request without a client budget")
 
 # -----------------------------------------------------------------------------
 # Provider Implementations
@@ -384,6 +499,8 @@ def chat_complete(
         else:
             current_model = config.gemini_model # gemini-2.5-flash
             logger.info(f"LLM Tier 1 (Scout): Using {current_model} for speed")
+
+        _charge_client_budget()
 
         # Rate limiting for Gemini
         rate_limiter = _get_gemini_rate_limiter(config)

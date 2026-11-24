@@ -1,7 +1,7 @@
 # app/api/batch.py
 # RESTful API endpoints for batch processing
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from typing import Dict, Any, List
 import logging
 import threading
@@ -9,9 +9,14 @@ import threading
 from app.services.storage import (
     add_batch, get_batch_status, get_recent_batches,
     get_queue_stats, init_db, create_discovering_batch,
-    update_discovery_progress, finalize_discovery
+    update_discovery_progress, finalize_discovery,
+    create_client_batch, reserve_client_discovery_batch,
+    finalize_client_discovery, fail_client_discovery,
+    OpenBatchLimitExceeded
 )
 from app.services.hybrid_discover import discover_forms_smart
+from app.api.auth import require_client
+from app.core.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +68,26 @@ def discover_async(batch_id: str, seed_url: str, max_forms: int):
 # API Endpoints
 # =============================================================================
 
+def open_batch_limit_response(key: str = "success"):
+    response = jsonify({
+        key: False,
+        "error": f"This client already has {Config.MAX_OPEN_BATCHES_PER_CLIENT} open batches. "
+                 "Wait for one to finish before creating another."
+    })
+    response.status_code = 429
+    response.headers["Retry-After"] = "60"
+    return response
+
+
+def too_many_urls_response(key: str = "success"):
+    return jsonify({
+        key: False,
+        "error": f"A batch may contain at most {Config.MAX_BATCH_URLS} URLs"
+    }), 413
+
+
 @batch_bp.route('/create', methods=['POST'])
+@require_client
 def create_batch():
     """
     Create a new batch of jobs.
@@ -112,8 +136,27 @@ def create_batch():
                     "error": "URL cannot be empty"
                 }), 400
 
-            max_forms = data.get('max_forms', 5000)
+            try:
+                max_forms = int(data.get('max_forms', Config.MAX_BATCH_URLS))
+            except (TypeError, ValueError):
+                return jsonify({
+                    "success": False,
+                    "error": "max_forms must be an integer"
+                }), 400
+            if max_forms < 1:
+                return jsonify({
+                    "success": False,
+                    "error": "max_forms must be positive"
+                }), 400
+            max_forms = min(max_forms, Config.MAX_BATCH_URLS)
             batch_name = data.get('name', f"Scan of {seed_url}")
+
+            try:
+                batch_id = reserve_client_discovery_batch(
+                    g.client_id, Config.MAX_OPEN_BATCHES_PER_CLIENT, batch_name
+                )
+            except OpenBatchLimitExceeded:
+                return open_batch_limit_response()
 
             logger.info(f"Starting hybrid discovery for {seed_url} (max {max_forms} forms)")
 
@@ -125,6 +168,7 @@ def create_batch():
                     strategy="auto"  # Auto-selects best strategy based on domain
                 )
             except Exception as e:
+                fail_client_discovery(batch_id, g.client_id)
                 logger.error(f"Hybrid discovery failed for {seed_url}: {str(e)}")
                 return jsonify({
                     "success": False,
@@ -132,27 +176,28 @@ def create_batch():
                 }), 400
 
             if not pdf_urls:
+                fail_client_discovery(batch_id, g.client_id)
                 return jsonify({
                     "success": False,
                     "error": "No PDF forms found on this website"
                 }), 404
 
-            # Create batch with discovered URLs (no threading, no async)
-            batch_id = add_batch(
-                urls=pdf_urls,
-                batch_name=batch_name,
-                config={},
-                discovery_status='completed'
-            )
+            pdf_urls = pdf_urls[:max_forms]
+            inserted = finalize_client_discovery(batch_id, g.client_id, pdf_urls)
+            if inserted is None:
+                return jsonify({
+                    "success": False,
+                    "error": "Discovery batch expired before it could be queued"
+                }), 409
 
-            logger.info(f"Synchronous discovery complete for batch {batch_id}: {len(pdf_urls)} forms")
+            logger.info(f"Synchronous discovery complete for batch {batch_id}: {inserted} forms")
 
             return jsonify({
                 "success": True,
                 "batch_id": batch_id,
-                "total_jobs": len(pdf_urls),
+                "total_jobs": inserted,
                 "status": "created",
-                "message": f"Batch created with {len(pdf_urls)} forms"
+                "message": f"Batch created with {inserted} forms"
             }), 201
 
         # Original behavior: Direct PDF URLs
@@ -168,6 +213,9 @@ def create_batch():
                 "success": False,
                 "error": "URLs must be a list"
             }), 400
+
+        if len(urls) > Config.MAX_BATCH_URLS:
+            return too_many_urls_response()
 
         # Filter valid URLs
         valid_urls = []
@@ -185,20 +233,24 @@ def create_batch():
         batch_name = data.get('name')
         config = data.get('config', {})
 
-        # Create batch
-        batch_id = add_batch(
-            urls=valid_urls,
-            batch_name=batch_name,
-            config=config
-        )
+        try:
+            batch_id, inserted = create_client_batch(
+                g.client_id,
+                valid_urls,
+                Config.MAX_OPEN_BATCHES_PER_CLIENT,
+                batch_name=batch_name,
+                config=config
+            )
+        except OpenBatchLimitExceeded:
+            return open_batch_limit_response()
 
-        logger.info(f"Created batch {batch_id} with {len(valid_urls)} jobs")
+        logger.info(f"Created batch {batch_id} with {inserted} jobs")
 
         return jsonify({
             "success": True,
             "batch_id": batch_id,
-            "total_jobs": len(valid_urls),
-            "message": f"Batch created successfully with {len(valid_urls)} jobs"
+            "total_jobs": inserted,
+            "message": f"Batch created successfully with {inserted} jobs"
         }), 201
 
     except Exception as e:

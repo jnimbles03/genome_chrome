@@ -153,7 +153,10 @@ def init_db():
             )
         """)
 
+        cursor.execute("ALTER TABLE batch_jobs ADD COLUMN IF NOT EXISTS client_id TEXT")
+
         # Create indexes for performance
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_batch_client_status ON batch_jobs(client_id, status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_forms_url_hash ON forms(url_hash)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_forms_status ON forms(status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_forms_entity ON forms(entity_name)")
@@ -232,6 +235,160 @@ def add_batch(urls: List[str], batch_name: Optional[str] = None, config: Optiona
 
         logger.info(f"Created batch {batch_id} with {len(job_ids)} jobs")
         return batch_id
+
+
+# =============================================================================
+# Per-client Batch Operations
+# =============================================================================
+
+class OpenBatchLimitExceeded(Exception):
+    """The client already has the maximum number of open batches."""
+
+
+# Namespace for pg_advisory_xact_lock keys taken on behalf of a client.
+_CLIENT_BATCH_LOCK_NAMESPACE = 0x46474231
+
+# A synchronous discovery that has not finished in this time was abandoned
+# (request timeout or crash) and no longer holds one of the client's slots.
+DISCOVERY_STALE_SECONDS = 3600
+
+
+def _new_batch_id() -> str:
+    import secrets
+    return f"batch_{int(time.time())}_{secrets.token_hex(4)}"
+
+
+def _claim_open_batch_slot(cursor, client_id: str, max_open: int) -> None:
+    """Serialize batch creation for one client and enforce its open-batch cap.
+
+    The advisory lock is held until the surrounding transaction ends, so the
+    count and the caller's insert are atomic across threads and instances.
+    """
+    cursor.execute(
+        "SELECT pg_advisory_xact_lock(%s, hashtext(%s))",
+        (_CLIENT_BATCH_LOCK_NAMESPACE, client_id),
+    )
+    cursor.execute("""
+        UPDATE batch_jobs
+        SET status = 'failed', discovery_status = 'failed', completed_at = %s
+        WHERE client_id = %s AND status = 'discovering' AND created_at < %s
+    """, (int(time.time()), client_id, int(time.time()) - DISCOVERY_STALE_SECONDS))
+    cursor.execute(
+        "SELECT COUNT(*) AS n FROM batch_jobs WHERE client_id = %s AND status IN ('running', 'discovering')",
+        (client_id,),
+    )
+    if cursor.fetchone()['n'] >= max_open:
+        raise OpenBatchLimitExceeded()
+
+
+def _enqueue_batch_jobs(cursor, batch_id: str, urls: List[str], priority: int = 0) -> int:
+    """Insert one pending job per URL not already queued. Returns rows inserted."""
+    timestamp = int(time.time())
+    inserted = 0
+    for url in dict.fromkeys(urls):
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        cursor.execute(
+            "SELECT 1 FROM job_queue WHERE url_hash = %s AND status IN ('pending', 'processing')",
+            (url_hash,),
+        )
+        if cursor.fetchone():
+            continue
+        cursor.execute("""
+            INSERT INTO job_queue (job_id, batch_id, url, url_hash, status, priority, created_at, max_retries)
+            VALUES (%s, %s, %s, %s, 'pending', %s, %s, 3)
+            ON CONFLICT (job_id) DO NOTHING
+        """, (f"job_{url_hash}_{timestamp}_{batch_id[-8:]}", batch_id, url, url_hash, priority, timestamp))
+        inserted += cursor.rowcount
+    return inserted
+
+
+def _mark_batch_enqueued(cursor, batch_id: str, inserted: int) -> None:
+    # A batch with no jobs of its own would never be completed by a worker.
+    status = 'running' if inserted else 'completed'
+    cursor.execute("""
+        UPDATE batch_jobs
+        SET total_jobs = %s, status = %s, completed_at = %s
+        WHERE batch_id = %s
+    """, (inserted, status, None if inserted else int(time.time()), batch_id))
+
+
+@retry_on_locked()
+def create_client_batch(client_id: str, urls: List[str], max_open: int,
+                        batch_name: Optional[str] = None, config: Optional[Dict] = None,
+                        priority: int = 0) -> Tuple[str, int]:
+    """Create a batch owned by ``client_id`` and queue its jobs in one transaction.
+
+    Raises OpenBatchLimitExceeded, inserting nothing, when the client already
+    has ``max_open`` batches running or discovering.
+
+    Returns:
+        (batch_id, jobs_inserted)
+    """
+    batch_id = _new_batch_id()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        _claim_open_batch_slot(cursor, client_id, max_open)
+        cursor.execute("""
+            INSERT INTO batch_jobs (batch_id, name, total_jobs, status, created_at, config, client_id)
+            VALUES (%s, %s, 0, 'running', %s, %s, %s)
+        """, (batch_id, batch_name, int(time.time()), json.dumps(config or {}), client_id))
+        inserted = _enqueue_batch_jobs(cursor, batch_id, urls, priority)
+        _mark_batch_enqueued(cursor, batch_id, inserted)
+
+    logger.info(f"Created batch {batch_id} with {inserted} jobs")
+    return batch_id, inserted
+
+
+@retry_on_locked()
+def reserve_client_discovery_batch(client_id: str, max_open: int, batch_name: str,
+                                   config: Optional[Dict] = None) -> str:
+    """Claim an open-batch slot for a discovery run before it starts.
+
+    Raises OpenBatchLimitExceeded when the client has no slot free.
+    """
+    batch_id = _new_batch_id()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        _claim_open_batch_slot(cursor, client_id, max_open)
+        cursor.execute("""
+            INSERT INTO batch_jobs (batch_id, name, total_jobs, status, created_at, config,
+                                    discovery_status, discovered_count, client_id)
+            VALUES (%s, %s, 0, 'discovering', %s, %s, 'in_progress', 0, %s)
+        """, (batch_id, batch_name, int(time.time()), json.dumps(config or {}), client_id))
+    return batch_id
+
+
+@retry_on_locked()
+def finalize_client_discovery(batch_id: str, client_id: str, urls: List[str]) -> Optional[int]:
+    """Queue discovered URLs on the batch reserved for this discovery run.
+
+    Returns the number of jobs inserted, or None (inserting nothing) if the
+    reservation is no longer an in-progress discovery owned by ``client_id``.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE batch_jobs
+            SET discovery_status = 'completed', discovered_count = %s
+            WHERE batch_id = %s AND client_id = %s AND status = 'discovering'
+            RETURNING batch_id
+        """, (len(urls), batch_id, client_id))
+        if cursor.fetchone() is None:
+            return None
+        inserted = _enqueue_batch_jobs(cursor, batch_id, urls)
+        _mark_batch_enqueued(cursor, batch_id, inserted)
+    return inserted
+
+
+@retry_on_locked()
+def fail_client_discovery(batch_id: str, client_id: str) -> None:
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE batch_jobs
+            SET status = 'failed', discovery_status = 'failed', completed_at = %s
+            WHERE batch_id = %s AND client_id = %s AND status = 'discovering'
+        """, (int(time.time()), batch_id, client_id))
 
 
 @retry_on_locked()  # Use default aggressive retry
