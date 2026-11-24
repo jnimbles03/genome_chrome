@@ -97,19 +97,41 @@ function setupEventListeners() {
 
 async function getMyUserId() {
   try {
-    const localData = await chrome.storage.local.get('userId');
-    return localData.userId || 'unknown';
+    const token = await getTeamApiToken();
+    return (token && getTeamTokenSubject(token)) || 'unknown';
   } catch (error) {
     return 'unknown';
   }
+}
+
+async function promptForTeamToken() {
+  const token = window.prompt('Enter your Team API token (ask your Form Genome admin):');
+  if (!token || !token.trim()) {
+    return false;
+  }
+  await setTeamApiToken(token.trim());
+  myUserId = await getMyUserId();
+  return true;
 }
 
 async function loadAllTeamForms() {
   showLoading(true);
 
   try {
+    if (!(await getTeamApiToken()) && !(await promptForTeamToken())) {
+      showError('A Team API token is required to view team forms.');
+      return;
+    }
+
     // Fetch all team forms
-    const formsResponse = await fetch(`${API_BASE_URL}/api/team/forms?limit=1000`);
+    let formsResponse = await fetch(`${API_BASE_URL}/api/team/forms?limit=1000`, {
+      headers: await getTeamAuthHeaders()
+    });
+    if (formsResponse.status === 401 && await promptForTeamToken()) {
+      formsResponse = await fetch(`${API_BASE_URL}/api/team/forms?limit=1000`, {
+        headers: await getTeamAuthHeaders()
+      });
+    }
     const formsData = await formsResponse.json();
 
     if (formsData.ok) {
@@ -694,7 +716,8 @@ async function saveEdit(rowId) {
     const response = await fetch(`${API_BASE_URL}/api/team/update`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...(await getTeamAuthHeaders())
       },
       body: JSON.stringify({
         user_id: form.user_id,
