@@ -107,7 +107,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --min-instances 0 \
     --port 8080 \
     --set-env-vars "FLASK_ENV=production,FLASK_DEBUG=false" \
-    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
+    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,SECRET_KEY=FORM_GENOME_SECRET_KEY:latest"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
