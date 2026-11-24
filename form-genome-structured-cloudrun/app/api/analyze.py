@@ -1,7 +1,7 @@
 # app/api/analyze.py
 # API endpoint for single file upload and analysis
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from werkzeug.utils import secure_filename
 import os
 import logging
@@ -18,6 +18,7 @@ except ImportError:
 # LLM services
 from app.services.title_llm import normalize_form_title, enforce_entity_consistency
 from app.services.llm_router import chat_complete, LLMError
+from app.core.auth import require_api_token, auth_settings, quota_exceeded
 from app.services.prompts import (
     SCOUT_SYSTEM_PROMPT, SCOUT_USER_PROMPT,
     ANALYST_SYSTEM_PROMPT, ANALYST_USER_PROMPT
@@ -472,12 +473,22 @@ def analyze_csv_file(file_path: str, filename: str) -> Dict[str, Any]:
 # API Endpoints
 # =============================================================================
 
+def _reserve_pdf_analysis():
+    """Consume one of the caller's daily PDF analyses, or return a 429 response."""
+    quota = auth_settings().upload_quota
+    if quota.reserve(g.api_identity):
+        return None
+    return quota_exceeded("Daily analysis quota exceeded", quota.remaining(g.api_identity))
+
+
 @analyze_bp.route('/upload', methods=['POST'])
+@require_api_token
 def upload_file():
     """
     Upload and analyze a file (PDF, TXT, or CSV).
 
     Request:
+        - Authorization: Bearer <token>
         - multipart/form-data with 'file' field
 
     Response:
@@ -498,6 +509,14 @@ def upload_file():
         # Check if URL is provided instead of file
         if request.is_json and 'url' in request.json:
             url = request.json['url']
+            if not isinstance(url, str) or not url.strip():
+                return jsonify({
+                    "success": False,
+                    "error": "URL must be a non-empty string"
+                }), 400
+            denied = _reserve_pdf_analysis()
+            if denied:
+                return denied
             logger.info(f"Analyzing URL: {url}")
             try:
                 results = analyze_url_logic(url)
@@ -552,7 +571,17 @@ def upload_file():
 
         # Save file to temporary location
         filename = secure_filename(file.filename)
+        if not allowed_file(filename):
+            return jsonify({
+                "success": False,
+                "error": "File type not allowed. Allowed types: PDF, TXT, CSV"
+            }), 400
         file_ext = filename.rsplit('.', 1)[1].lower()
+
+        if file_ext == 'pdf':
+            denied = _reserve_pdf_analysis()
+            if denied:
+                return denied
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_ext}') as temp_file:
             temp_path = temp_file.name

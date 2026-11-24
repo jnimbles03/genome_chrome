@@ -39,6 +39,9 @@ def create_app():
     # Enable CORS for API access
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+    from app.core.auth import init_auth
+    init_auth(app)
+
     # Register APIs
     # Register APIs
     register_batch_api(app)
