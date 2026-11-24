@@ -18,6 +18,7 @@ except ImportError:
 # LLM services
 from app.services.title_llm import normalize_form_title, enforce_entity_consistency
 from app.services.llm_router import chat_complete, LLMError
+from app.services.safe_fetch import safe_get, BlockedDestinationError
 from app.services.prompts import (
     SCOUT_SYSTEM_PROMPT, SCOUT_USER_PROMPT,
     ANALYST_SYSTEM_PROMPT, ANALYST_USER_PROMPT
@@ -43,8 +44,6 @@ def allowed_file(filename: str) -> bool:
 
 def analyze_url_logic(url: str):
     """Internal logic for analyzing a URL (follows redirects and peeks)"""
-    import requests
-    from io import BytesIO
     from bs4 import BeautifulSoup
     from urllib.parse import urljoin
     import re
@@ -58,10 +57,18 @@ def analyze_url_logic(url: str):
         "Connection": "keep-alive",
         "Upgrade-Insecure-Requests": "1"
     }
-    
+
+    def fetch(target_url: str):
+        resp = safe_get(target_url, headers=headers, timeout=20, max_bytes=MAX_FILE_SIZE)
+        if resp.status_code == 403:
+            logger.error(f"Deep Peek blocked by server (403 Forbidden): {target_url}")
+            raise Exception(f"Access denied by server. This site may require browser-based JavaScript execution to reveal PDF sources. Try using the Chrome extension's 'Peek & Analyze' feature instead.")
+        if not resp.ok:
+            raise Exception(f"Server returned HTTP {resp.status_code}")
+        return resp
+
     try:
-        resp = requests.get(url, headers=headers, timeout=20)
-        resp.raise_for_status()
+        resp = fetch(url)
         
         content_type = resp.headers.get('Content-Type', '').lower()
         
@@ -112,8 +119,7 @@ def analyze_url_logic(url: str):
             # Follow the first PDF link found
             target_pdf = pdf_links[0]
             logger.info(f"Deep Peek found PDF: {target_pdf}")
-            resp2 = requests.get(target_pdf, headers=headers, timeout=20)
-            resp2.raise_for_status()
+            resp2 = fetch(target_pdf)
             
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
                 tmp.write(resp2.content)
@@ -130,12 +136,9 @@ def analyze_url_logic(url: str):
         else:
             raise Exception(f"Unsupported content type: {content_type}")
             
-    except requests.exceptions.HTTPError as e:
-        if '403' in str(e):
-            logger.error(f"Deep Peek blocked by server (403 Forbidden): {url}")
-            raise Exception(f"Access denied by server. This site may require browser-based JavaScript execution to reveal PDF sources. Try using the Chrome extension's 'Peek & Analyze' feature instead.")
-        logger.error(f"Deep Peek HTTP error: {e}")
-        raise e
+    except BlockedDestinationError as e:
+        logger.warning(f"Refused URL fetch: {e}")
+        raise
     except Exception as e:
         logger.error(f"Deep Peek Analysis failed: {e}")
         raise e
