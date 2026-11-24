@@ -51,6 +51,11 @@ if [ -z "$GEMINI_API_KEY" ] || [ -z "$ANTHROPIC_API_KEY" ]; then
     exit 1
 fi
 
+if [ -z "$FORMGENOME_API_TOKENS" ]; then
+    echo -e "${RED}❌ Error: FORMGENOME_API_TOKENS (comma-separated client tokens) not found in .env file${NC}"
+    exit 1
+fi
+
 echo -e "${GREEN}✅ API keys loaded${NC}"
 echo ""
 
@@ -73,6 +78,15 @@ if gcloud secrets describe ANTHROPIC_API_KEY &>/dev/null; then
 else
     echo "Creating new ANTHROPIC_API_KEY secret..."
     echo -n "$ANTHROPIC_API_KEY" | gcloud secrets create ANTHROPIC_API_KEY --data-file=-
+fi
+
+# Update FORMGENOME_API_TOKENS
+if gcloud secrets describe FORMGENOME_API_TOKENS &>/dev/null; then
+    echo "Updating existing FORMGENOME_API_TOKENS secret..."
+    echo -n "$FORMGENOME_API_TOKENS" | gcloud secrets versions add FORMGENOME_API_TOKENS --data-file=-
+else
+    echo "Creating new FORMGENOME_API_TOKENS secret..."
+    echo -n "$FORMGENOME_API_TOKENS" | gcloud secrets create FORMGENOME_API_TOKENS --data-file=-
 fi
 
 echo -e "${GREEN}✅ Secrets configured${NC}"
@@ -107,7 +121,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --min-instances 0 \
     --port 8080 \
     --set-env-vars "FLASK_ENV=production,FLASK_DEBUG=false" \
-    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
+    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,FORMGENOME_API_TOKENS=FORMGENOME_API_TOKENS:latest"
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
