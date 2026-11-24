@@ -1,7 +1,8 @@
 # app/api/dashboard.py
 # API endpoints for the dashboard
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
+from app.core.auth import require_api_token, auth_settings, quota_exceeded
 from app.services.storage import get_db, save_form
 import json
 import logging
@@ -259,16 +260,28 @@ def delete_team_forms():
 
 
 @dashboard_bp.route('/team/reanalyze', methods=['POST'])
+@require_api_token
 def reanalyze_team_forms():
-    """Re-analyze forms by ID"""
+    """Re-analyze forms by ID. Requires ``Authorization: Bearer <token>``."""
     try:
-        data = request.json
+        settings = auth_settings()
+        identity = g.api_identity
+
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"ok": False, "error": "Invalid JSON"}), 400
         analysis_ids = data.get('analysis_ids', [])
         
-        if not analysis_ids:
+        if not analysis_ids or not isinstance(analysis_ids, list):
             return jsonify({"ok": False, "error": "No IDs provided"}), 400
+
+        if len(analysis_ids) > settings.max_batch_urls:
+            return jsonify({
+                "ok": False,
+                "error": f"Too many IDs: at most {settings.max_batch_urls} per request"
+            }), 400
             
-        ids = [int(id) for id in analysis_ids]
+        ids = list(dict.fromkeys(int(id) for id in analysis_ids))
         
         with get_db() as conn:
             cursor = conn.cursor()
@@ -280,6 +293,9 @@ def reanalyze_team_forms():
         
         if not urls:
              return jsonify({"ok": False, "error": "No valid forms found for re-analysis"}), 404
+
+        if not settings.job_quota.reserve(identity, len(urls)):
+            return quota_exceeded("Daily batch job quota exceeded", settings.job_quota.remaining(identity))
 
         from app.services.storage import add_job
         queued_count = 0

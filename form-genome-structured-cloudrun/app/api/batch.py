@@ -1,10 +1,12 @@
 # app/api/batch.py
 # RESTful API endpoints for batch processing
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from typing import Dict, Any, List
 import logging
 import threading
+
+from app.core.auth import require_api_token, auth_settings, quota_exceeded
 
 from app.services.storage import (
     add_batch, get_batch_status, get_recent_batches,
@@ -64,9 +66,14 @@ def discover_async(batch_id: str, seed_url: str, max_forms: int):
 # =============================================================================
 
 @batch_bp.route('/create', methods=['POST'])
+@require_api_token
 def create_batch():
     """
-    Create a new batch of jobs.
+    Create a new batch of jobs. Requires ``Authorization: Bearer <token>``.
+
+    The server caps URLs per request (FORMGENOME_MAX_BATCH_URLS), discovery
+    size (FORMGENOME_MAX_DISCOVERY_FORMS), and jobs queued per identity per
+    day (FORMGENOME_DAILY_QUEUED_JOBS).
 
     Request body (Option 1 - Direct PDF URLs):
     {
@@ -94,9 +101,12 @@ def create_batch():
     }
     """
     try:
+        settings = auth_settings()
+        identity = g.api_identity
+
         # Parse request
-        data = request.get_json()
-        if not data:
+        data = request.get_json(silent=True)
+        if not data or not isinstance(data, dict):
             return jsonify({
                 "success": False,
                 "error": "Invalid JSON"
@@ -112,38 +122,57 @@ def create_batch():
                     "error": "URL cannot be empty"
                 }), 400
 
-            max_forms = data.get('max_forms', 5000)
+            max_forms = data.get('max_forms', settings.max_discovery_forms)
+            if isinstance(max_forms, bool) or not isinstance(max_forms, int) or max_forms < 1:
+                return jsonify({
+                    "success": False,
+                    "error": "max_forms must be a positive integer"
+                }), 400
+            max_forms = min(max_forms, settings.max_discovery_forms)
             batch_name = data.get('name', f"Scan of {seed_url}")
 
-            logger.info(f"Starting hybrid discovery for {seed_url} (max {max_forms} forms)")
-
-            # Use hybrid discovery (4-tier cascade: CSE → Sitemap → Crawler → LLM)
+            # Reserve the worst case up front and refund what discovery does not
+            # queue. The discovery run itself always costs one unit.
+            if not settings.job_quota.reserve(identity, max_forms):
+                return quota_exceeded("Daily batch job quota exceeded", settings.job_quota.remaining(identity))
+            unused = max_forms - 1
             try:
-                pdf_urls = discover_forms_smart(
-                    url=seed_url,
-                    max_forms=max_forms,
-                    strategy="auto"  # Auto-selects best strategy based on domain
+                logger.info(f"Starting hybrid discovery for {seed_url} (max {max_forms} forms)")
+
+                # Use hybrid discovery (4-tier cascade: CSE → Sitemap → Crawler → LLM)
+                try:
+                    pdf_urls = discover_forms_smart(
+                        url=seed_url,
+                        max_forms=max_forms,
+                        strategy="auto"  # Auto-selects best strategy based on domain
+                    )
+                except Exception as e:
+                    logger.error(f"Hybrid discovery failed for {seed_url}: {str(e)}")
+                    return jsonify({
+                        "success": False,
+                        "error": f"Discovery failed: {str(e)}"
+                    }), 400
+
+                if not pdf_urls:
+                    return jsonify({
+                        "success": False,
+                        "error": "No PDF forms found on this website"
+                    }), 404
+
+                pdf_urls = list(pdf_urls)[:max_forms]
+                # add_batch commits jobs one at a time, so a failure part-way
+                # through still leaves earlier jobs queued; keep those charged.
+                unused = max_forms - len(pdf_urls)
+
+                # Create batch with discovered URLs (no threading, no async)
+                batch_id = add_batch(
+                    urls=pdf_urls,
+                    batch_name=batch_name,
+                    config={},
+                    discovery_status='completed'
                 )
-            except Exception as e:
-                logger.error(f"Hybrid discovery failed for {seed_url}: {str(e)}")
-                return jsonify({
-                    "success": False,
-                    "error": f"Discovery failed: {str(e)}"
-                }), 400
-
-            if not pdf_urls:
-                return jsonify({
-                    "success": False,
-                    "error": "No PDF forms found on this website"
-                }), 404
-
-            # Create batch with discovered URLs (no threading, no async)
-            batch_id = add_batch(
-                urls=pdf_urls,
-                batch_name=batch_name,
-                config={},
-                discovery_status='completed'
-            )
+            finally:
+                settings.job_quota.release(identity, unused)
 
             logger.info(f"Synchronous discovery complete for batch {batch_id}: {len(pdf_urls)} forms")
 
@@ -169,6 +198,12 @@ def create_batch():
                 "error": "URLs must be a list"
             }), 400
 
+        if len(urls) > settings.max_batch_urls:
+            return jsonify({
+                "success": False,
+                "error": f"Too many URLs: at most {settings.max_batch_urls} per batch"
+            }), 400
+
         # Filter valid URLs
         valid_urls = []
         for url in urls:
@@ -184,6 +219,9 @@ def create_batch():
         # Optional parameters
         batch_name = data.get('name')
         config = data.get('config', {})
+
+        if not settings.job_quota.reserve(identity, len(valid_urls)):
+            return quota_exceeded("Daily batch job quota exceeded", settings.job_quota.remaining(identity))
 
         # Create batch
         batch_id = add_batch(

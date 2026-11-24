@@ -219,6 +219,9 @@ def test_api_endpoints():
     try:
         from main import create_app
 
+        os.environ.setdefault("FORMGENOME_API_TOKENS", "placeholder-test-token:test-suite")
+        token = os.environ["FORMGENOME_API_TOKENS"].split(",")[0].rpartition(":")[0]
+
         # Create Flask test client
         app = create_app()
         client = app.test_client()
@@ -245,7 +248,8 @@ def test_api_endpoints():
                 ],
                 "name": "API Test Batch"
             },
-            content_type='application/json'
+            content_type='application/json',
+            headers={"Authorization": f"Bearer {token}"}
         )
 
         if response.status_code != 201:

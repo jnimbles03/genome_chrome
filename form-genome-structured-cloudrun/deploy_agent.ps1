@@ -131,7 +131,7 @@ gcloud run deploy $SERVICE_NAME `
     --port 8080 `
     --set-env-vars "FLASK_ENV=production,FLASK_DEBUG=false,DB_USER=postgres,DB_NAME=formgenome,CLOUD_SQL_CONNECTION_NAME=formgenome:us-central1:form-genome-db" `
     --add-cloudsql-instances "formgenome:us-central1:form-genome-db" `
-    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,DB_PASSWORD=DB_PASSWORD:latest"
+    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,DB_PASSWORD=DB_PASSWORD:latest,FORMGENOME_API_TOKENS=FORMGENOME_API_TOKENS:latest"
 
 Write-Host ""
 Write-Color "========================================" $Green
