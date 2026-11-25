@@ -244,6 +244,8 @@ canvas[id^="gchart"]{
 })();
 // Helper to fetch JSON
 async function getJSON(u,o){ const r=await fetch(u,o||{}); const t=await r.text(); if(!r.ok) throw new Error(t||r.statusText); try{return JSON.parse(t);}catch{throw new Error('Non-JSON');} }
+function esc(v){ if(v===undefined||v===null) return ''; return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function safeHttpUrl(u){ try{ const p=new URL(String(u),location.href); return (p.protocol==='http:'||p.protocol==='https:')?p.href:''; }catch{ return ''; } }
 // Column definitions (reuse same as dashboard but filtered)
 // Column definitions for the global genetics table.  The widest fields
 // (key_drivers and special_requirements) are appended to the end so they
@@ -297,26 +299,26 @@ function renderTable(rows){
     html+='<tr>'+allCols.map(function(c){
       // Link for source_url
       if(c==='source_url'){
-        const u=r.url||r.source_url||'';
-        return '<td>'+ (u ? "<a href='"+u+"' target='_blank' rel='noopener'>View</a>" : '') + '</td>';
+        const u=safeHttpUrl(r.url||r.source_url||'');
+        return '<td>'+ (u ? "<a href='"+esc(u)+"' target='_blank' rel='noopener'>View</a>" : '') + '</td>';
       }
       // Signature fields
-      if(c==='signature_count') return '<td>'+((r.signature_analysis&&r.signature_analysis.signature_count)||0)+'</td>';
-      if(c==='witness_signature_count') return '<td>'+((r.signature_analysis&&r.signature_analysis.witness_signature_count)||0)+'</td>';
-      if(c==='conditional_signature_count') return '<td>'+((r.signature_analysis&&r.signature_analysis.conditional_signature_count)||0)+'</td>';
+      if(c==='signature_count') return '<td>'+esc((r.signature_analysis&&r.signature_analysis.signature_count)||0)+'</td>';
+      if(c==='witness_signature_count') return '<td>'+esc((r.signature_analysis&&r.signature_analysis.witness_signature_count)||0)+'</td>';
+      if(c==='conditional_signature_count') return '<td>'+esc((r.signature_analysis&&r.signature_analysis.conditional_signature_count)||0)+'</td>';
       // Pages
       if(c==='pages'){
         const p=r.pages||r.page_count||'';
-        return '<td>'+p+'</td>';
+        return '<td>'+esc(p)+'</td>';
       }
       // Numeric defaults
       if(['attachment_count','field_count','text_fields','checkboxes','dropdowns','data_validation_count','language_count','estimated_signer_time','estimated_processing_time'].includes(c)){
-        return '<td>'+(r[c]!=null?r[c]:0)+'</td>';
+        return '<td>'+esc(r[c]!=null?r[c]:0)+'</td>';
       }
       // Arrays
       if(c==='key_drivers'||c==='special_requirements'){
         const arr=r[c]||[];
-        return '<td>'+(Array.isArray(arr)?arr.join(', '):'')+'</td>';
+        return '<td>'+esc(Array.isArray(arr)?arr.join(', '):'')+'</td>';
       }
       // Booleans
       if(boolCols.includes(c)){
@@ -329,7 +331,7 @@ function renderTable(rows){
       if(typeof val==='object'){
         try{val=JSON.stringify(val);}catch{val='';}
       }
-      return '<td>'+String(val)+'</td>';
+      return '<td>'+esc(val)+'</td>';
     }).join('')+'</tr>';
   });
   html+='</tbody></table>';
@@ -397,9 +399,9 @@ function renderHardestForms(rows){
     // Complexity badge colour
     let compBg=badgeColor;
     html+='<tr>';
-    html+='<td>'+formName+'</td>';
+    html+='<td>'+esc(formName)+'</td>';
     html+='<td><span class="complexity-badge" style="background:'+compBg+'">'+comp.toFixed(1)+'</span></td>';
-    html+='<td>'+pages+'</td>';
+    html+='<td>'+esc(pages)+'</td>';
     html+='<td>'+issues.join(', ')+'</td>';
     html+='<td><span class="priority-dot" style="background:'+color+';"></span>'+priority+'</td>';
     html+='</tr>';
