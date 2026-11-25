@@ -5,11 +5,79 @@ from flask import Blueprint, jsonify, request
 from app.services.storage import get_db, save_form
 import json
 import logging
+import math
+import re
 import time
 
 logger = logging.getLogger(__name__)
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
+
+# Fields the team dashboard shows as short text or numbers. Writes that put
+# markup or quote characters in them are refused rather than stored.
+PLAIN_TEXT_FIELDS = (
+    'action_type',
+    'payment_amount',
+    'estimated_signer_time',
+    'estimated_processing_time',
+)
+NUMERIC_FIELDS = (
+    'pages',
+    'total_field_count',
+    'complexity_score',
+    'nigo_score',
+    'signature_count',
+    'attachment_count',
+)
+MAX_PLAIN_TEXT_LENGTH = 200
+_UNSAFE_TEXT = re.compile(r'[<>"\'`\x00-\x1f\x7f]')
+_NUMERIC_TEXT = re.compile(r'^\s*-?\d+(\.\d+)?\s*$')
+
+
+def _plain_text_error(name, value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return f"{name} must be text"
+    if isinstance(value, (int, float)):
+        return None if math.isfinite(value) else f"{name} must be text"
+    if not isinstance(value, str):
+        return f"{name} must be text"
+    if len(value) > MAX_PLAIN_TEXT_LENGTH:
+        return f"{name} is too long"
+    if _UNSAFE_TEXT.search(value):
+        return f"{name} contains characters that are not allowed"
+    return None
+
+
+def _numeric_error(name, value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return f"{name} must be a number"
+    if isinstance(value, (int, float)):
+        return None if math.isfinite(value) else f"{name} must be a number"
+    if isinstance(value, str) and _NUMERIC_TEXT.match(value):
+        return None
+    return f"{name} must be a number"
+
+
+def validate_team_form_fields(form_data, user_id=None):
+    """Return an error message if a dashboard field is not plain text or a number."""
+    if not isinstance(form_data, dict):
+        return "form_data must be an object"
+    error = _plain_text_error('user_id', user_id)
+    if error:
+        return error
+    for name in PLAIN_TEXT_FIELDS:
+        error = _plain_text_error(name, form_data.get(name))
+        if error:
+            return error
+    for name in NUMERIC_FIELDS:
+        error = _numeric_error(name, form_data.get(name))
+        if error:
+            return error
+    return None
 
 @dashboard_bp.route('/records_unique', methods=['GET'])
 @dashboard_bp.route('/team/forms', methods=['GET'])
@@ -127,6 +195,10 @@ def sync_team_form():
         if not form_data:
             return jsonify({"ok": False, "error": "Missing form_data"}), 400
 
+        error = validate_team_form_fields(form_data, user_id)
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
+
         # Extract core fields
         url = form_data.get('source_url')
         if not url:
@@ -165,6 +237,10 @@ def update_team_form():
         
         if not analysis_id or not form_data:
             return jsonify({"ok": False, "error": "Missing analysis_id or form_data"}), 400
+
+        error = validate_team_form_fields(form_data)
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
 
         with get_db() as conn:
             cursor = conn.cursor()
