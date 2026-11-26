@@ -1,5 +1,20 @@
 // Form Genome Batch Report Generator
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Allowlist the scheme on the raw string so control characters or whitespace
+// that browsers strip before parsing cannot smuggle in javascript: or data:.
+function isHttpUrl(value) {
+  return typeof value === 'string' && /^https?:\/\//i.test(value);
+}
+
 function generateBatchReport(analysisCache, currentPdfs) {
   // Filter analyzed PDFs
   const analyzedForms = currentPdfs
@@ -153,15 +168,15 @@ function generateReportHTML(forms, stats) {
     return items.map(form => `
       <tr>
         <td class="primary">
-          <div class="form-name">${getFormDisplayName(form)}</div>
+          <div class="form-name">${escapeHtml(getFormDisplayName(form))}</div>
           <div class="form-meta">
-            ${form.pages || 1} pages • ${form.total_field_count || form.field_count || 0} fields
+            ${escapeHtml(form.pages || 1)} pages • ${escapeHtml(form.total_field_count || form.field_count || 0)} fields
             ${form.language_count > 1 ? ` • <span class="lang-tag">+${form.language_count - 1} Langs</span>` : ''}
           </div>
         </td>
         <td>
           <div class="complexity-badge ${getComplexityClass(form.complexity_score)}">
-            ${form.complexity_score || 0}
+            ${escapeHtml(form.complexity_score || 0)}
           </div>
         </td>
         <td>
@@ -171,7 +186,9 @@ function generateReportHTML(forms, stats) {
           ${!form.signature_required && !form.notarization_required && !form.payment_required ? '<span class="tag tag-ok">Info Only</span>' : ''}
         </td>
         <td>
-          <a href="${form.pdf_url}" target="_blank" class="action-link">View PDF &rarr;</a>
+          ${isHttpUrl(form.pdf_url)
+            ? `<a href="${escapeHtml(form.pdf_url)}" target="_blank" rel="noopener noreferrer" class="action-link">View PDF &rarr;</a>`
+            : '<span class="form-meta">Link unavailable</span>'}
         </td>
       </tr>
     `).join('');
@@ -187,7 +204,8 @@ function generateReportHTML(forms, stats) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Form Analysis Report — ${stats.entity_name}</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+  <title>Form Analysis Report — ${escapeHtml(stats.entity_name)}</title>
   <style>
     :root {
       --bg: #f8fafc;
@@ -289,19 +307,19 @@ function generateReportHTML(forms, stats) {
 
   <div class="container">
     <h1>Where customers feel the friction</h1>
-    <p class="sub">This report spotlights the moments that make <strong>${stats.entity_name}</strong> forms hard to complete, increasing support costs and abandonment.</p>
+    <p class="sub">This report spotlights the moments that make <strong>${escapeHtml(stats.entity_name)}</strong> forms hard to complete, increasing support costs and abandonment.</p>
 
     <div class="stats">
       <div class="stat-card">
-        <div class="stat-val">${stats.avg_complexity}</div>
+        <div class="stat-val">${escapeHtml(stats.avg_complexity)}</div>
         <div class="stat-label">Avg. Complexity Score</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val">${stats.hardest_name}</div>
+        <div class="stat-val">${escapeHtml(stats.hardest_name)}</div>
         <div class="stat-label">Hardest Form</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val">${stats.payment_total}</div>
+        <div class="stat-val">${escapeHtml(stats.payment_total)}</div>
         <div class="stat-label">Total Payment Requests</div>
       </div>
     </div>
@@ -313,8 +331,8 @@ function generateReportHTML(forms, stats) {
           <div class="hard">
             ${metric.icon}
             <div>
-              <strong>${metric.title}</strong><span class="badge">${metric.percentage}${metric.badge}</span>
-              <div class="note">${metric.description}</div>
+              <strong>${escapeHtml(metric.title)}</strong><span class="badge">${escapeHtml(metric.percentage)}${escapeHtml(metric.badge)}</span>
+              <div class="note">${escapeHtml(metric.description)}</div>
             </div>
           </div>
         `).join('')}
