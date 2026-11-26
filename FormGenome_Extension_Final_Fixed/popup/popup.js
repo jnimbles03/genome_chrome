@@ -136,6 +136,23 @@ function showPdfListMode(pdfs) {
   renderPdfList();
 }
 
+function createListElement(tag, className, text, title) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  if (title !== undefined) element.title = title;
+  return element;
+}
+
+function toSafeHttpUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function renderPdfList() {
   const container = document.getElementById('pdfItems');
   container.innerHTML = '';
@@ -161,42 +178,64 @@ function renderPdfList() {
     const item = document.createElement('div');
     item.className = 'pdf-item';
 
-    // Determine badge text and style based on action
-    let badge = '';
+    // Page-supplied values (pdf.text, pdf.url, cached.*) must only reach the DOM as text.
+    const badges = [];
     if (pdf.language_count > 1) {
-      badge += `<span class="lang-badge" title="${pdf.language_count} language versions">+${pdf.language_count - 1} Langs</span>`;
+      badges.push(createListElement('span', 'lang-badge', `+${pdf.language_count - 1} Langs`, `${pdf.language_count} language versions`));
     }
 
     if (pdf.action === 'navigate') {
-      badge += `<span class="lang-badge warning" title="URL is broken or blocked. Click the form link on the page first.">⚠️ Click to Open</span>`;
+      badges.push(createListElement('span', 'lang-badge warning', '⚠️ Click to Open', 'URL is broken or blocked. Click the form link on the page first.'));
     } else if (pdf.action === 'peek') {
-      badge += `<span class="lang-badge implicit" title="This is a landing page. Click to peek for PDF.">🔍 Landing Page</span>`;
+      badges.push(createListElement('span', 'lang-badge implicit', '🔍 Landing Page', 'This is a landing page. Click to peek for PDF.'));
     }
 
     // Determine button based on action
-    let actionButton = '';
+    let actionButton = null;
     if (isAnalyzed && !hasError) {
-      actionButton = `<button class="btn-view-results" data-url="${pdf.url}">View</button>`;
+      actionButton = createListElement('button', 'btn-view-results', 'View');
     } else if (pdf.action === 'navigate') {
-      actionButton = `<button class="btn-view-results warning" data-url="${pdf.url}" data-action="navigate" disabled title="Click the form link on the page first">Click Form Link</button>`;
+      actionButton = createListElement('button', 'btn-view-results warning', 'Click Form Link', 'Click the form link on the page first');
+      actionButton.dataset.action = 'navigate';
+      actionButton.disabled = true;
     } else if (pdf.action === 'peek') {
-      actionButton = `<button class="btn-view-results peek" data-url="${pdf.url}" data-action="peek">Peek & Analyze</button>`;
+      actionButton = createListElement('button', 'btn-view-results peek', 'Peek & Analyze');
+      actionButton.dataset.action = 'peek';
+    }
+    if (actionButton) actionButton.dataset.url = pdf.url;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `pdf_${index}`;
+    checkbox.dataset.url = pdf.url;
+    checkbox.dataset.action = pdf.action;
+    checkbox.checked = !isAnalyzed;
+
+    const info = createListElement('div', 'pdf-item-info');
+
+    const nameDiv = createListElement('div', 'pdf-item-name', undefined, pdf.text);
+    const link = createListElement('a', 'form-link', pdf.text, 'Open form in new tab');
+    const safeUrl = toSafeHttpUrl(pdf.url);
+    if (safeUrl) link.href = safeUrl;
+    link.target = '_blank';
+    nameDiv.append(link, ' ', ...badges);
+    info.appendChild(nameDiv);
+
+    if (cached && cached.entity) {
+      info.appendChild(createListElement('div', 'pdf-item-entity', cached.entity));
     }
 
-    item.innerHTML = `
-      <input type="checkbox" id="pdf_${index}" data-url="${pdf.url}" data-action="${pdf.action}" ${isAnalyzed ? '' : 'checked'}>
-      <div class="pdf-item-info">
-        <div class="pdf-item-name" title="${pdf.text}">
-            <a href="${pdf.url}" target="_blank" class="form-link" title="Open form in new tab">${pdf.text}</a>
-            ${badge}
-        </div>
-        ${cached && cached.entity ? `<div class="pdf-item-entity">${cached.entity}</div>` : ''}
-        <div class="pdf-item-status ${isAnalyzed ? 'analyzed' : ''} ${hasError ? 'error' : ''}">
-          ${isAnalyzed ? (hasError ? 'Error' : `✓ Analyzed (${cached.confidence_tier || 'Ready'})`) : 'Not analyzed'}
-        </div>
-      </div>
-      ${actionButton}
-    `;
+    const status = createListElement(
+      'div',
+      'pdf-item-status',
+      isAnalyzed ? (hasError ? 'Error' : `✓ Analyzed (${cached.confidence_tier || 'Ready'})`) : 'Not analyzed'
+    );
+    if (isAnalyzed) status.classList.add('analyzed');
+    if (hasError) status.classList.add('error');
+    info.appendChild(status);
+
+    item.append(checkbox, info);
+    if (actionButton) item.appendChild(actionButton);
 
     item.querySelector('input[type="checkbox"]').addEventListener('change', updateSelectAllState);
 
