@@ -1,0 +1,7 @@
+{
+  "name": "genome-chrome-security-tests",
+  "private": true,
+  "dependencies": {
+    "jsdom": "24.1.3"
+  }
+}
