@@ -159,7 +159,11 @@ function showSinglePdfMode(url) {
 }
 
 function showPdfListMode(pdfs) {
-  currentPdfs = pdfs;
+  currentPdfs = pdfs.filter(pdf => pdf && isHttpUrl(pdf.url));
+  if (currentPdfs.length === 0) {
+    showNoPdf();
+    return;
+  }
   document.getElementById('pdfList').classList.remove('hidden');
   hideAll(['singlePdf', 'noPdf', 'status', 'error', 'results']);
 
@@ -191,46 +195,74 @@ function renderPdfList() {
     const item = document.createElement('div');
     item.className = 'pdf-item';
 
+    // Link text, URLs and cached analysis fields come from the scanned page or
+    // the analysis API, so they are only ever assigned as text or attributes.
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `pdf_${index}`;
+    checkbox.dataset.url = pdf.url;
+    checkbox.dataset.action = pdf.action;
+    checkbox.checked = !isAnalyzed;
+    item.appendChild(checkbox);
+
+    const info = document.createElement('div');
+    info.className = 'pdf-item-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'pdf-item-name';
+    nameEl.title = pdf.text || '';
+
+    const link = document.createElement('a');
+    link.href = pdf.url;
+    link.target = '_blank';
+    link.className = 'form-link';
+    link.title = 'Open form in new tab';
+    link.textContent = pdf.text || '';
+    nameEl.appendChild(link);
+
     // Determine badge text and style based on action
-    let badge = '';
     if (pdf.language_count > 1) {
-      badge += `<span class="lang-badge" title="${pdf.language_count} language versions">+${pdf.language_count - 1} Langs</span>`;
+      nameEl.append(' ', createPdfBadge('lang-badge', `${pdf.language_count} language versions`, `+${pdf.language_count - 1} Langs`));
     }
 
     if (pdf.action === 'navigate') {
-      badge += `<span class="lang-badge warning" title="URL is broken or blocked. Click the form link on the page first.">⚠️ Click to Open</span>`;
+      nameEl.append(' ', createPdfBadge('lang-badge warning', 'URL is broken or blocked. Click the form link on the page first.', '⚠️ Click to Open'));
     } else if (pdf.action === 'peek') {
-      badge += `<span class="lang-badge implicit" title="This is a landing page. Click to peek for PDF.">🔍 Landing Page</span>`;
+      nameEl.append(' ', createPdfBadge('lang-badge implicit', 'This is a landing page. Click to peek for PDF.', '🔍 Landing Page'));
     }
 
     if (pdf.badge_type === 'deep-scan') {
-      badge += `<span class="lang-badge deep-scan" title="Found on neighboring page">Neighbor Page</span>`;
+      nameEl.append(' ', createPdfBadge('lang-badge deep-scan', 'Found on neighboring page', 'Neighbor Page'));
     }
+    info.appendChild(nameEl);
+
+    if (cached && cached.entity) {
+      const entityEl = document.createElement('div');
+      entityEl.className = 'pdf-item-entity';
+      entityEl.textContent = cached.entity;
+      info.appendChild(entityEl);
+    }
+
+    const statusEl = document.createElement('div');
+    statusEl.className = `pdf-item-status ${isAnalyzed ? 'analyzed' : ''} ${hasError ? 'error' : ''}`;
+    statusEl.textContent = isAnalyzed ? (hasError ? 'Error' : `✓ Analyzed (${cached.confidence_tier || 'Ready'})`) : 'Not analyzed';
+    info.appendChild(statusEl);
+    item.appendChild(info);
 
     // Determine button based on action
-    let actionButton = '';
+    let actionButton = null;
     if (isAnalyzed && !hasError) {
-      actionButton = `<button class="btn-view-results" data-url="${pdf.url}">View</button>`;
+      actionButton = createActionButton('btn-view-results', pdf.url, 'View');
     } else if (pdf.action === 'navigate') {
-      actionButton = `<button class="btn-view-results warning" data-url="${pdf.url}" data-action="navigate" disabled title="Click the form link on the page first">Click Form Link</button>`;
+      actionButton = createActionButton('btn-view-results warning', pdf.url, 'Click Form Link', 'navigate');
+      actionButton.disabled = true;
+      actionButton.title = 'Click the form link on the page first';
     } else if (pdf.action === 'peek') {
-      actionButton = `<button class="btn-view-results peek" data-url="${pdf.url}" data-action="peek">Peek & Analyze</button>`;
+      actionButton = createActionButton('btn-view-results peek', pdf.url, 'Peek & Analyze', 'peek');
     }
-
-    item.innerHTML = `
-      <input type="checkbox" id="pdf_${index}" data-url="${pdf.url}" data-action="${pdf.action}" ${isAnalyzed ? '' : 'checked'}>
-      <div class="pdf-item-info">
-        <div class="pdf-item-name" title="${pdf.text}">
-            <a href="${pdf.url}" target="_blank" class="form-link" title="Open form in new tab">${pdf.text}</a>
-            ${badge}
-        </div>
-        ${cached && cached.entity ? `<div class="pdf-item-entity">${cached.entity}</div>` : ''}
-        <div class="pdf-item-status ${isAnalyzed ? 'analyzed' : ''} ${hasError ? 'error' : ''}">
-          ${isAnalyzed ? (hasError ? 'Error' : `✓ Analyzed (${cached.confidence_tier || 'Ready'})`) : 'Not analyzed'}
-        </div>
-      </div>
-      ${actionButton}
-    `;
+    if (actionButton) {
+      item.appendChild(actionButton);
+    }
 
     item.querySelector('input[type="checkbox"]').addEventListener('change', updateSelectAllState);
 
@@ -254,6 +286,35 @@ function renderPdfList() {
 
   updateSelectAllState();
   updateSelectedCount();
+}
+
+function isHttpUrl(url) {
+  if (typeof url !== 'string') return false;
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
+}
+
+function createPdfBadge(className, title, text) {
+  const badge = document.createElement('span');
+  badge.className = className;
+  badge.title = title;
+  badge.textContent = text;
+  return badge;
+}
+
+function createActionButton(className, url, text, action) {
+  const button = document.createElement('button');
+  button.className = className;
+  button.dataset.url = url;
+  if (action) {
+    button.dataset.action = action;
+  }
+  button.textContent = text;
+  return button;
 }
 
 function updateSelectAllState() {
@@ -692,7 +753,7 @@ async function handleDeepScan() {
     const response = await chrome.tabs.sendMessage(tab.id, { type: 'START_DEEP_SCAN' });
 
     if (response && response.success && response.pdfs) {
-      const newPdfs = response.pdfs;
+      const newPdfs = response.pdfs.filter(pdf => pdf && isHttpUrl(pdf.url));
 
       // Merge with existing
       const existingUrls = new Set(currentPdfs.map(p => p.url));
