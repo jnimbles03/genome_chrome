@@ -1,0 +1,10 @@
+{
+  "name": "genome-chrome-security-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/html-injection-popup.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "25.0.1"
+  }
+}
