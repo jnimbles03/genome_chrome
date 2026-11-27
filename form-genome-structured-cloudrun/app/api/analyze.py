@@ -18,6 +18,7 @@ except ImportError:
 # LLM services
 from app.services.title_llm import normalize_form_title, enforce_entity_consistency
 from app.services.llm_router import chat_complete, LLMError
+from app.services.remote_fetch import MAX_HTML_BYTES, open_stream, read_capped
 from app.services.prompts import (
     SCOUT_SYSTEM_PROMPT, SCOUT_USER_PROMPT,
     ANALYST_SYSTEM_PROMPT, ANALYST_USER_PROMPT
@@ -60,19 +61,25 @@ def analyze_url_logic(url: str):
     }
     
     try:
-        resp = requests.get(url, headers=headers, timeout=20)
-        resp.raise_for_status()
-        
-        content_type = resp.headers.get('Content-Type', '').lower()
+        resp = open_stream(url, headers=headers, timeout=20)
+        try:
+            resp.raise_for_status()
+            content_type = resp.headers.get('Content-Type', '').lower()
+            if 'application/pdf' in content_type:
+                body = read_capped(resp, MAX_FILE_SIZE)
+            elif 'text/html' in content_type:
+                body = read_capped(resp, MAX_HTML_BYTES, truncate=True)
+        finally:
+            resp.close()
         
         if 'application/pdf' in content_type:
             # It's a direct PDF
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-                tmp.write(resp.content)
+                tmp.write(body)
                 tmp_path = tmp.name
             try:
                 results = analyze_pdf_file(tmp_path, url.split('/')[-1] or "downloaded.pdf", url=url)
-                results['fileSize'] = len(resp.content)
+                results['fileSize'] = len(body)
                 return results
             finally:
                 if os.path.exists(tmp_path):
@@ -80,7 +87,7 @@ def analyze_url_logic(url: str):
         
         elif 'text/html' in content_type:
             # Deep Peek for PDF links
-            soup = BeautifulSoup(resp.content, 'html.parser')
+            soup = BeautifulSoup(body, 'html.parser')
             pdf_links = []
             
             # 1. Standard Anchor tags
@@ -112,15 +119,19 @@ def analyze_url_logic(url: str):
             # Follow the first PDF link found
             target_pdf = pdf_links[0]
             logger.info(f"Deep Peek found PDF: {target_pdf}")
-            resp2 = requests.get(target_pdf, headers=headers, timeout=20)
-            resp2.raise_for_status()
+            resp2 = open_stream(target_pdf, headers=headers, timeout=20)
+            try:
+                resp2.raise_for_status()
+                pdf_body = read_capped(resp2, MAX_FILE_SIZE)
+            finally:
+                resp2.close()
             
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-                tmp.write(resp2.content)
+                tmp.write(pdf_body)
                 tmp_path = tmp.name
             try:
                 results = analyze_pdf_file(tmp_path, target_pdf.split('/')[-1], url=target_pdf)
-                results['fileSize'] = len(resp2.content)
+                results['fileSize'] = len(pdf_body)
                 results['was_peaked'] = True
                 results['original_url'] = url
                 return results
