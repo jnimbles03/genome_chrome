@@ -7,7 +7,6 @@ import sys
 import time
 import logging
 import threading
-import requests
 import hashlib
 from io import BytesIO
 from typing import Optional, Dict, Any, List
@@ -32,6 +31,7 @@ from app.services.storage import (
 )
 from app.services.title_llm import make_title
 from app.services.llm_router import LLMError
+from app.services.remote_fetch import open_stream, read_capped
 
 logger = logging.getLogger(__name__)
 
@@ -159,25 +159,12 @@ def download_pdf(url: str, timeout: float = 30.0, max_size: int = 50*1024*1024) 
     }
 
     logger.info(f"Downloading PDF: {url}")
-    response = requests.get(url, headers=headers, timeout=timeout, stream=True)
-    response.raise_for_status()
-
-    # Check content length
-    content_length = response.headers.get('content-length')
-    if content_length and int(content_length) > max_size:
-        raise ValueError(f"PDF too large: {int(content_length)} bytes (max {max_size})")
-
-    # Download with size limit
-    content = BytesIO()
-    downloaded = 0
-    for chunk in response.iter_content(chunk_size=8192):
-        if chunk:
-            downloaded += len(chunk)
-            if downloaded > max_size:
-                raise ValueError(f"PDF too large: >{max_size} bytes")
-            content.write(chunk)
-
-    pdf_bytes = content.getvalue()
+    response = open_stream(url, headers=headers, timeout=timeout)
+    try:
+        response.raise_for_status()
+        pdf_bytes = read_capped(response, max_size)
+    finally:
+        response.close()
     logger.info(f"Downloaded PDF: {len(pdf_bytes)} bytes")
     return pdf_bytes
 

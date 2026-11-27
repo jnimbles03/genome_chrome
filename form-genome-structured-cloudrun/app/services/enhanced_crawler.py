@@ -10,6 +10,8 @@ from requests.adapters import HTTPAdapter
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
+from app.services.remote_fetch import MAX_PDF_BYTES, open_stream, read_capped
+
 __all__ = ["EnhancedWebCrawler"]
 
 CRAWLER_MARKER = "full-2025-09-06"
@@ -22,6 +24,7 @@ except Exception:
     pass
 
 TRACKER_PARAMS = ("utm_", "gclid", "fbclid", "mc_cid", "mc_eid", "trk")
+RETRY_STATUSES = (429, 500, 502, 503, 504)
 
 DEFAULT_CFG = dict(
     timeout=30,
@@ -58,12 +61,14 @@ class EnhancedWebCrawler:
     def __init__(self, config: dict | None = None):
         self.config = {**DEFAULT_CFG, **(config or {})}
 
-        # requests session with retries
+        # requests session with retries. Status-based retries are done in
+        # remote_fetch.open_stream: urllib3 reads the whole error body into
+        # memory before it retries a status or honors Retry-After.
         self.session = requests.Session()
         retry = Retry(
             total=3, connect=3, read=3, backoff_factor=0.5,
-            status_forcelist=(429, 500, 502, 503, 504),
             allowed_methods=False,
+            respect_retry_after_header=False,
         )
         adapter = HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=32)
         self.session.mount("http://", adapter)
@@ -81,6 +86,20 @@ class EnhancedWebCrawler:
 
     def _too_late(self) -> bool:
         return time.monotonic() >= self.deadline
+
+    def _open(self, url: str) -> requests.Response:
+        return open_stream(
+            url,
+            session=self.session,
+            timeout=(self.config["timeout"], self.config["read_timeout"]),
+            retry_statuses=RETRY_STATUSES,
+            retries=3,
+        )
+
+    def _get(self, url: str, max_bytes: int, truncate: bool = False) -> requests.Response:
+        resp = self._open(url)
+        read_capped(resp, max_bytes, truncate=truncate)
+        return resp
 
     def _wait_per_host(self, host: str):
         t = self.next_ok.get(host, 0.0)
@@ -116,16 +135,17 @@ class EnhancedWebCrawler:
         host = urlparse(url).netloc
         self._wait_per_host(host)
         try:
-            r = self.session.get(url, timeout=(self.config["timeout"], self.config["read_timeout"]))
+            r = self._open(url)
+            ctype = (r.headers.get("content-type") or "").lower()
+            if "pdf" in ctype:
+                self._record_pdf(url, read_capped(r, MAX_PDF_BYTES), ctype, referrer=None)
+                return
+            if not r.ok or "text/html" not in ctype:
+                r.close()
+                return
+            read_capped(r, self.config["max_content"], truncate=True)
         except requests.RequestException as e:
             print(f"[crawler] GET failed {url}: {e}")
-            return
-
-        ctype = (r.headers.get("content-type") or "").lower()
-        if "pdf" in ctype:
-            self._record_pdf(url, r.content, ctype, referrer=None)
-            return
-        if not r.ok or "text/html" not in ctype:
             return
 
         html = r.text[: self.config["max_content"]]
@@ -180,9 +200,11 @@ class EnhancedWebCrawler:
                                   or L.lower().endswith(".pdf")
                                   or (("attachment" in hcd or "filename=" in hcd) and ".pdf" in hcd))
                 if looks_like_pdf:
-                    g = self.session.get(h.url, timeout=(self.config["timeout"], self.config["read_timeout"]))
+                    g = self._open(h.url)
                     if g.ok:
-                        self._record_pdf(h.url, g.content, hct, referrer=url)
+                        self._record_pdf(h.url, read_capped(g, MAX_PDF_BYTES), hct, referrer=url)
+                    else:
+                        g.close()
             except requests.RequestException as e:
                 print(f"[crawler] HEAD/GET failed {L}: {e}")
                 continue
@@ -279,9 +301,11 @@ class EnhancedWebCrawler:
                 """) or []
                 for href in hrefs[:100]:  # cap to avoid overload
                     try:
-                        r = self.session.get(href, timeout=(self.config['timeout'], self.config['read_timeout']))
+                        r = self._open(href)
                         if r.ok and 'pdf' in r.headers.get('content-type', '').lower():
-                            self._record_pdf(href, r.content, r.headers.get('content-type', '').lower(), referrer=page_url)
+                            self._record_pdf(href, read_capped(r, MAX_PDF_BYTES), r.headers.get('content-type', '').lower(), referrer=page_url)
+                        else:
+                            r.close()
                     except Exception as e:
                         print(f"[crawler] direct fetch failed {href}: {e}")
                         continue
@@ -289,9 +313,14 @@ class EnhancedWebCrawler:
                 for resp in pdf_hits:
                     try:
                         url = resp.url
-                        body = resp.body()
                         hdrs = resp.headers or {}
                         ctype = (hdrs.get("content-type") or "").lower()
+                        declared = (hdrs.get("content-length") or "").strip()
+                        if (declared.isdigit() and int(declared) <= MAX_PDF_BYTES
+                                and not hdrs.get("content-encoding")):
+                            body = resp.body()
+                        else:
+                            body = self._get(url, MAX_PDF_BYTES).content
                         self._record_pdf(url, body, ctype, referrer=page_url)
                     except Exception:
                         continue
@@ -310,7 +339,7 @@ class EnhancedWebCrawler:
         sitemaps: list[str] = []
         try:
             robots = urljoin(base, "/robots.txt")
-            r = self.session.get(robots, timeout=(self.config["timeout"], self.config["read_timeout"]))
+            r = self._get(robots, self.config["max_content"], truncate=True)
             if r.ok:
                 for line in r.text.splitlines():
                     if line.lower().startswith("sitemap:"):
@@ -320,7 +349,7 @@ class EnhancedWebCrawler:
         for guess in ("/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml"):
             try:
                 u = urljoin(base, guess)
-                g = self.session.get(u, timeout=(self.config["timeout"], self.config["read_timeout"]))
+                g = self._get(u, self.config["max_content"])
                 if g.ok and ("<urlset" in g.text or "<sitemapindex" in g.text):
                     sitemaps.append(u)
             except requests.RequestException:
@@ -331,7 +360,7 @@ class EnhancedWebCrawler:
         seeds: list[str] = []
         for sm in sitemaps:
             try:
-                r = self.session.get(sm, timeout=(self.config["timeout"], self.config["read_timeout"]))
+                r = self._get(sm, self.config["max_content"])
                 if not r.ok:
                     continue
                 try:

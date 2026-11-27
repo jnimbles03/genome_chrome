@@ -7,10 +7,10 @@ import re
 import json
 import logging
 import urllib.parse as up
-import requests
 from typing import List, Dict, Any, Tuple
 
 from app.services.llm_router import chat_complete, LLMError
+from app.services.remote_fetch import MAX_HTML_BYTES, get_capped
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def _norm(u: str) -> str:
 
 def fetch(url: str, timeout: float = 10.0) -> Tuple[int, str, Dict[str, str]]:
     """Fetch a single URL (HTML)."""
-    r = requests.get(url, headers=BROWSER_HEADERS, timeout=timeout, allow_redirects=True)
+    r = get_capped(url, MAX_HTML_BYTES, truncate=True, headers=BROWSER_HEADERS, timeout=timeout)
     return r.status_code, (r.text or ""), {k.lower(): v for k, v in r.headers.items()}
 
 def try_sitemap(seed: str, timeout: float = 8.0) -> List[str]:
