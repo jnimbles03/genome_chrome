@@ -188,34 +188,34 @@ function renderForms() {
     const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 
     return `
-      <div class="form-card" data-key="${form._storage_key}">
+      <div class="form-card" data-key="${escapeHtml(form._storage_key)}">
         <div class="form-card-header">
           <div>
             <div class="form-title">${escapeHtml(formName)}</div>
             <div class="form-entity">${escapeHtml(entityName)}</div>
           </div>
           <div class="form-complexity ${complexityClass}">
-            ${complexity}/10
+            ${escapeHtml(complexity)}/10
           </div>
         </div>
 
         <div class="form-stats">
           <div class="form-stat">
             <span>📄</span>
-            <span>${form.pages || 1} pages</span>
+            <span>${escapeHtml(form.pages || 1)} pages</span>
           </div>
           <div class="form-stat">
             <span>📝</span>
-            <span>${form.total_field_count || form.field_count || 0} fields</span>
+            <span>${escapeHtml(form.total_field_count || form.field_count || 0)} fields</span>
           </div>
           <div class="form-stat">
             <span>⚠️</span>
-            <span>NIGO: ${form.nigo_score || 0}</span>
+            <span>NIGO: ${escapeHtml(form.nigo_score || 0)}</span>
           </div>
           ${form.signature_analysis?.signature_count ? `
           <div class="form-stat">
             <span>✍️</span>
-            <span>${form.signature_analysis.signature_count} signatures</span>
+            <span>${escapeHtml(form.signature_analysis.signature_count)} signatures</span>
           </div>
           ` : ''}
         </div>
@@ -228,9 +228,7 @@ function renderForms() {
 
         <div class="form-meta">
           <div class="form-url">
-            ${form.source_url || form.pdf_url ?
-        `<a href="${escapeHtml(form.source_url || form.pdf_url)}" target="_blank" class="url-link" title="Open form in new tab">${escapeHtml(form.source_url || form.pdf_url)}</a>` :
-        'No URL'}
+            ${renderFormUrl(form.source_url || form.pdf_url)}
           </div>
           <div class="form-date">${dateStr}</div>
         </div>
@@ -255,10 +253,31 @@ function getFormDisplayName(form) {
   return name || 'Untitled';
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeHttpUrl(value) {
+  if (typeof value !== 'string' || !value) return '';
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:' ? value : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function renderFormUrl(url) {
+  if (!url) return 'No URL';
+  const href = safeHttpUrl(url);
+  if (!href) return escapeHtml(url);
+  return `<a href="${escapeHtml(href)}" target="_blank" class="url-link" title="Open form in new tab">${escapeHtml(url)}</a>`;
 }
 
 function exportAllToCSV() {

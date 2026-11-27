@@ -37,6 +37,15 @@ def allowed_file(filename: str) -> bool:
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def _as_int(value: Any, default: int = 0) -> int:
+    """Coerce an LLM-provided score to an int; anything non-numeric becomes the default."""
+    if isinstance(value, bool):
+        return default
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
 # =============================================================================
 # Helper Utilities
 # =============================================================================
@@ -338,7 +347,7 @@ def analyze_pdf_file(file_path: str, filename: str, url: str = None) -> Dict[str
             "complexity_score": score_result["score"],  # FORCE overwrite LLM's raw prediction with our deterministic math
             "scoring_method": score_result["method"],
             "scoring_weights": score_result["weights"],
-            "nigo_score": final_res.get('nigo_score', 0),
+            "nigo_score": _as_int(final_res.get('nigo_score', 0)),
             "title": title, "entity": entity,
             "total_field_count": final_res.get('total_field_count'),
             "checkboxes": final_res.get('checkboxes'),
