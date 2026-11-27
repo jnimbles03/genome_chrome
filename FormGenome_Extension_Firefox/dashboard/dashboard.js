@@ -227,11 +227,13 @@ function renderTable() {
 
   const orderedColumns = getOrderedColumns();
 
-  tbody.innerHTML = filteredForms.map(form => {
-    const cells = orderedColumns.map(col => renderCell(col.key, form)).join('');
-    // Store metadata in data attribute for potential usage
-    return `<tr>${cells}</tr>`;
-  }).join('');
+  const rows = document.createDocumentFragment();
+  filteredForms.forEach(form => {
+    const tr = document.createElement('tr');
+    orderedColumns.forEach(col => tr.appendChild(renderCell(col.key, form)));
+    rows.appendChild(tr);
+  });
+  tbody.replaceChildren(rows);
 }
 
 function getOrderedColumns() {
@@ -266,33 +268,53 @@ function renderHeaders(thead) {
   setupColumnDragAndDrop();
 }
 
+// Stored analysis fields come from the analysis API (LLM output), so every
+// value is rendered as text and never parsed as HTML.
 function renderCell(key, form) {
   const val = form[key];
-  let content = val;
+  const td = document.createElement('td');
 
-  // Formatting Logic
   if (key === 'source_url' || key === 'pdf_url') {
-    const url = val || '';
-    if (url) {
-      content = `<a href="${url}" target="_blank" class="url-link" title="${url}">${url}</a>`;
+    const url = val === null || val === undefined ? '' : String(val);
+    const href = safeHttpUrl(url);
+    if (href) {
+      const link = document.createElement('a');
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.className = 'url-link';
+      link.title = url;
+      link.textContent = url;
+      td.appendChild(link);
     } else {
-      content = '';
+      td.textContent = url;
     }
   } else if (typeof val === 'boolean') {
-    content = val ? 'Yes' : 'No';
-    return `<td class="${val ? 'yes' : 'no'}">${content}</td>`;
+    td.className = val ? 'yes' : 'no';
+    td.textContent = val ? 'Yes' : 'No';
   } else if (key === 'complexity_score') {
     const num = parseInt(val) || 0;
-    let cls = num >= 7 ? 'complexity-high' : num >= 4 ? 'complexity-medium' : 'complexity-low';
-    return `<td class="${cls}">${num}</td>`;
+    td.className = num >= 7 ? 'complexity-high' : num >= 4 ? 'complexity-medium' : 'complexity-low';
+    td.textContent = String(num);
   } else if (key === 'analyzed_at') {
-    content = new Date(val || Date.now()).toLocaleString();
+    td.textContent = new Date(val || Date.now()).toLocaleString();
+  } else {
+    td.textContent = val === null || val === undefined ? '' : String(val);
   }
 
-  // Null/Undefined check
-  if (content === null || content === undefined) content = '';
+  return td;
+}
 
-  return `<td>${content}</td>`;
+// Returns the URL only when it is an absolute http(s) URL, so stored values
+// such as javascript: or data: URLs never become clickable links.
+function safeHttpUrl(value) {
+  if (typeof value !== 'string' || value === '') return null;
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:' ? value : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Global Sort Handler

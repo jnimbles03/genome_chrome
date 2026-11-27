@@ -153,15 +153,15 @@ function generateReportHTML(forms, stats) {
     return items.map(form => `
       <tr>
         <td class="primary">
-          <div class="form-name">${getFormDisplayName(form)}</div>
+          <div class="form-name">${escapeReportHtml(getFormDisplayName(form))}</div>
           <div class="form-meta">
-            ${form.pages || 1} pages • ${form.total_field_count || form.field_count || 0} fields
-            ${form.language_count > 1 ? ` • <span class="lang-tag">+${form.language_count - 1} Langs</span>` : ''}
+            ${escapeReportHtml(form.pages || 1)} pages • ${escapeReportHtml(form.total_field_count || form.field_count || 0)} fields
+            ${form.language_count > 1 ? ` • <span class="lang-tag">+${escapeReportHtml(form.language_count - 1)} Langs</span>` : ''}
           </div>
         </td>
         <td>
           <div class="complexity-badge ${getComplexityClass(form.complexity_score)}">
-            ${form.complexity_score || 0}
+            ${escapeReportHtml(form.complexity_score || 0)}
           </div>
         </td>
         <td>
@@ -171,7 +171,7 @@ function generateReportHTML(forms, stats) {
           ${!form.signature_required && !form.notarization_required && !form.payment_required ? '<span class="tag tag-ok">Info Only</span>' : ''}
         </td>
         <td>
-          <a href="${form.pdf_url}" target="_blank" class="action-link">View PDF &rarr;</a>
+          <a ${safeReportUrl(form.pdf_url) ? `href="${escapeReportHtml(form.pdf_url)}"` : ''} target="_blank" rel="noopener noreferrer" class="action-link">View PDF &rarr;</a>
         </td>
       </tr>
     `).join('');
@@ -187,7 +187,7 @@ function generateReportHTML(forms, stats) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Form Analysis Report — ${stats.entity_name}</title>
+  <title>Form Analysis Report — ${escapeReportHtml(stats.entity_name)}</title>
   <style>
     :root {
       --bg: #f8fafc;
@@ -289,19 +289,19 @@ function generateReportHTML(forms, stats) {
 
   <div class="container">
     <h1>Where customers feel the friction</h1>
-    <p class="sub">This report spotlights the moments that make <strong>${stats.entity_name}</strong> forms hard to complete, increasing support costs and abandonment.</p>
+    <p class="sub">This report spotlights the moments that make <strong>${escapeReportHtml(stats.entity_name)}</strong> forms hard to complete, increasing support costs and abandonment.</p>
 
     <div class="stats">
       <div class="stat-card">
-        <div class="stat-val">${stats.avg_complexity}</div>
+        <div class="stat-val">${escapeReportHtml(stats.avg_complexity)}</div>
         <div class="stat-label">Avg. Complexity Score</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val">${stats.hardest_name}</div>
+        <div class="stat-val">${escapeReportHtml(stats.hardest_name)}</div>
         <div class="stat-label">Hardest Form</div>
       </div>
       <div class="stat-card">
-        <div class="stat-val">${stats.payment_total}</div>
+        <div class="stat-val">${escapeReportHtml(stats.payment_total)}</div>
         <div class="stat-label">Total Payment Requests</div>
       </div>
     </div>
@@ -387,6 +387,28 @@ function downloadReport(html, entityName) {
 
 function downloadCSV(csvContent, entityName) {
   downloadViaAnchor(csvContent, 'text/csv;charset=utf-8;', 'Form_Analysis_Latest.csv');
+}
+
+// The report is saved as a standalone HTML file, so every stored analysis
+// value must be escaped before it is placed in the markup.
+function escapeReportHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeReportUrl(value) {
+  if (typeof value !== 'string' || value === '') return null;
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:' ? value : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 function getFormDisplayName(form) {
