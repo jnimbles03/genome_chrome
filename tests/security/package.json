@@ -1,0 +1,7 @@
+{
+  "name": "dashboard-html-injection-tests",
+  "private": true,
+  "dependencies": {
+    "puppeteer-core": "24.2.0"
+  }
+}
