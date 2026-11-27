@@ -1,0 +1,10 @@
+# Dependencies for the dashboard HTML-injection regression tests.
+# Versions match form-genome-structured-cloudrun/requirements.txt where the
+# product pins them. pytest and python-dotenv are the same pins.
+pypdf==3.17.4
+Flask==3.0.0
+python-dotenv==1.0.0
+pytest==7.4.3
+# Imported by app.services.storage when the API package loads. The tests never
+# open a database connection. 2.9.9 is the floor of the product pin >=2.9.9.
+psycopg2-binary==2.9.9
