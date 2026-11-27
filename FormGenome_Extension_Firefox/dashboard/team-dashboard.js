@@ -241,9 +241,9 @@ function renderTable() {
 
     return `
       <tr class="${isMyForm ? 'editable' : ''} ${isRecent ? 'recently-updated' : ''}"
-          data-row-id="${rowId}"
-          data-analysis-id="${form.analysis_id}"
-          data-form='${JSON.stringify(form).replace(/'/g, "&apos;")}'>
+          data-row-id="${escapeHtml(rowId)}"
+          data-analysis-id="${escapeHtml(form.analysis_id)}"
+          data-form="${escapeHtml(JSON.stringify(form))}">
         ${cells}
       </tr>
     `;
@@ -319,10 +319,10 @@ function renderCell(columnKey, form, isMyForm, rowId) {
 
   switch (columnKey) {
     case 'checkbox':
-      return `<td><input type="checkbox" class="row-checkbox" data-analysis-id="${form.analysis_id}" ${selectedFormIds.has(form.analysis_id) ? 'checked' : ''}></td>`;
+      return `<td><input type="checkbox" class="row-checkbox" data-analysis-id="${escapeHtml(form.analysis_id)}" ${selectedFormIds.has(form.analysis_id) ? 'checked' : ''}></td>`;
 
     case 'actions':
-      return `<td>${isMyForm ? `<button class="edit-btn" data-edit-row="${rowId}">Edit</button>` : ''}</td>`;
+      return `<td>${isMyForm ? `<button class="edit-btn" data-edit-row="${escapeHtml(rowId)}">Edit</button>` : ''}</td>`;
 
     case 'form_name':
       return `<td class="form-name">${escapeHtml(form.form_name || 'Untitled')}</td>`;
@@ -331,7 +331,7 @@ function renderCell(columnKey, form, isMyForm, rowId) {
       return `<td>${escapeHtml(form.entity_name || '')}</td>`;
 
     case 'llm_model':
-      const model = form.llm_model || 'Unknown';
+      const model = String(form.llm_model || 'Unknown');
       const badgeClass = model.includes('Gemini') ? 'badge-gemini' : 'badge-claude';
       const style = model.includes('Gemini') ? 'background: #e6f4ea; color: #137333; padding: 2px 6px; border-radius: 4px; font-size: 11px;'
         : 'background: #fce8e6; color: #c5221f; padding: 2px 6px; border-radius: 4px; font-size: 11px;';
@@ -341,28 +341,28 @@ function renderCell(columnKey, form, isMyForm, rowId) {
       return `<td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(form.source_url || '')}</td>`;
 
     case 'pages':
-      return `<td>${form.pages || 1}</td>`;
+      return `<td>${escapeHtml(form.pages || 1)}</td>`;
 
     case 'total_field_count':
-      return `<td>${form.total_field_count || 0}</td>`;
+      return `<td>${escapeHtml(form.total_field_count || 0)}</td>`;
 
     case 'complexity_score':
-      return `<td class="${complexityClass}">${complexity}</td>`;
+      return `<td class="${complexityClass}">${escapeHtml(complexity)}</td>`;
 
     case 'nigo_score':
-      return `<td>${form.nigo_score || 0}</td>`;
+      return `<td>${escapeHtml(form.nigo_score || 0)}</td>`;
 
     case 'confidence_tier':
       return `<td>${escapeHtml(form.confidence_tier || 'High')}</td>`;
 
     case 'action_type':
-      return `<td>${form.action_type || ''}</td>`;
+      return `<td>${escapeHtml(form.action_type || '')}</td>`;
 
     case 'signature_required':
       return `<td class="${form.signature_required ? 'yes' : 'no'}">${form.signature_required ? 'Yes' : 'No'}</td>`;
 
     case 'signature_count':
-      return `<td>${form.signature_count || 0}</td>`;
+      return `<td>${escapeHtml(form.signature_count || 0)}</td>`;
 
     case 'notarization_required':
       return `<td class="${form.notarization_required ? 'yes' : 'no'}">${form.notarization_required ? 'Yes' : 'No'}</td>`;
@@ -371,13 +371,13 @@ function renderCell(columnKey, form, isMyForm, rowId) {
       return `<td class="${form.attachments_required ? 'yes' : 'no'}">${form.attachments_required ? 'Yes' : 'No'}</td>`;
 
     case 'attachment_count':
-      return `<td>${form.attachment_count || 0}</td>`;
+      return `<td>${escapeHtml(form.attachment_count || 0)}</td>`;
 
     case 'payment_required':
       return `<td class="${form.payment_required ? 'yes' : 'no'}">${form.payment_required ? 'Yes' : 'No'}</td>`;
 
     case 'payment_amount':
-      return `<td>${form.payment_amount || ''}</td>`;
+      return `<td>${escapeHtml(form.payment_amount || '')}</td>`;
 
     case 'identification_required':
       return `<td class="${form.identification_required ? 'yes' : 'no'}">${form.identification_required ? 'Yes' : 'No'}</td>`;
@@ -404,10 +404,10 @@ function renderCell(columnKey, form, isMyForm, rowId) {
       return `<td>${escapeHtml(form.industry_subvertical || '')}</td>`;
 
     case 'estimated_signer_time':
-      return `<td>${form.estimated_signer_time || ''}</td>`;
+      return `<td>${escapeHtml(form.estimated_signer_time || '')}</td>`;
 
     case 'estimated_processing_time':
-      return `<td>${form.estimated_processing_time || ''}</td>`;
+      return `<td>${escapeHtml(form.estimated_processing_time || '')}</td>`;
 
     case 'analyzed_at':
       return `<td>${new Date(form.analyzed_at || Date.now()).toLocaleDateString()}</td>`;
@@ -504,7 +504,7 @@ function startEdit(rowId) {
     return;
   }
 
-  const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  const row = document.querySelector(`tr[data-row-id="${CSS.escape(rowId)}"]`);
   const form = JSON.parse(row.dataset.form);
   editingRowId = rowId;
 
@@ -538,8 +538,8 @@ function renderEditCell(columnKey, form) {
   switch (columnKey) {
     case 'actions':
       return `<td>
-        <button class="save-btn" data-save-row="${rowId}">Save</button>
-        <button class="cancel-btn" data-cancel-row="${rowId}">Cancel</button>
+        <button class="save-btn" data-save-row="${escapeHtml(rowId)}">Save</button>
+        <button class="cancel-btn" data-cancel-row="${escapeHtml(rowId)}">Cancel</button>
       </td>`;
 
     case 'form_name':
@@ -556,16 +556,16 @@ function renderEditCell(columnKey, form) {
       return `<td><input class="edit-field" name="source_url" value="${escapeHtml(form.source_url || '')}" /></td>`;
 
     case 'pages':
-      return `<td><input class="edit-field" type="number" name="pages" value="${form.pages || 1}" /></td>`;
+      return `<td><input class="edit-field" type="number" name="pages" value="${escapeHtml(form.pages || 1)}" /></td>`;
 
     case 'total_field_count':
-      return `<td><input class="edit-field" type="number" name="total_field_count" value="${form.total_field_count || 0}" /></td>`;
+      return `<td><input class="edit-field" type="number" name="total_field_count" value="${escapeHtml(form.total_field_count || 0)}" /></td>`;
 
     case 'complexity_score':
-      return `<td><input class="edit-field" type="number" min="0" max="10" name="complexity_score" value="${form.complexity_score || 0}" /></td>`;
+      return `<td><input class="edit-field" type="number" min="0" max="10" name="complexity_score" value="${escapeHtml(form.complexity_score || 0)}" /></td>`;
 
     case 'nigo_score':
-      return `<td><input class="edit-field" type="number" min="0" max="10" name="nigo_score" value="${form.nigo_score || 0}" /></td>`;
+      return `<td><input class="edit-field" type="number" min="0" max="10" name="nigo_score" value="${escapeHtml(form.nigo_score || 0)}" /></td>`;
 
     case 'confidence_tier':
       return `<td>
@@ -577,7 +577,7 @@ function renderEditCell(columnKey, form) {
       </td>`;
 
     case 'action_type':
-      return `<td><input class="edit-field" name="action_type" value="${form.action_type || ''}" /></td>`;
+      return `<td><input class="edit-field" name="action_type" value="${escapeHtml(form.action_type || '')}" /></td>`;
 
     case 'signature_required':
       return `<td>
@@ -588,7 +588,7 @@ function renderEditCell(columnKey, form) {
       </td>`;
 
     case 'signature_count':
-      return `<td><input class="edit-field" type="number" name="signature_count" value="${form.signature_count || 0}" /></td>`;
+      return `<td><input class="edit-field" type="number" name="signature_count" value="${escapeHtml(form.signature_count || 0)}" /></td>`;
 
     case 'notarization_required':
       return `<td>
@@ -607,7 +607,7 @@ function renderEditCell(columnKey, form) {
       </td>`;
 
     case 'attachment_count':
-      return `<td><input class="edit-field" type="number" name="attachment_count" value="${form.attachment_count || 0}" /></td>`;
+      return `<td><input class="edit-field" type="number" name="attachment_count" value="${escapeHtml(form.attachment_count || 0)}" /></td>`;
 
     case 'payment_required':
       return `<td>
@@ -618,7 +618,7 @@ function renderEditCell(columnKey, form) {
       </td>`;
 
     case 'payment_amount':
-      return `<td><input class="edit-field" name="payment_amount" value="${form.payment_amount || ''}" /></td>`;
+      return `<td><input class="edit-field" name="payment_amount" value="${escapeHtml(form.payment_amount || '')}" /></td>`;
 
     case 'identification_required':
       return `<td>
@@ -670,10 +670,10 @@ function renderEditCell(columnKey, form) {
       return `<td><input class="edit-field" name="industry_subvertical" value="${escapeHtml(form.industry_subvertical || '')}" /></td>`;
 
     case 'estimated_signer_time':
-      return `<td><input class="edit-field" name="estimated_signer_time" value="${form.estimated_signer_time || ''}" /></td>`;
+      return `<td><input class="edit-field" name="estimated_signer_time" value="${escapeHtml(form.estimated_signer_time || '')}" /></td>`;
 
     case 'estimated_processing_time':
-      return `<td><input class="edit-field" name="estimated_processing_time" value="${form.estimated_processing_time || ''}" /></td>`;
+      return `<td><input class="edit-field" name="estimated_processing_time" value="${escapeHtml(form.estimated_processing_time || '')}" /></td>`;
 
     case 'analyzed_at':
       return `<td>${new Date(form.analyzed_at || Date.now()).toLocaleDateString()}</td>`;
@@ -684,7 +684,7 @@ function renderEditCell(columnKey, form) {
 }
 
 async function saveEdit(rowId) {
-  const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  const row = document.querySelector(`tr[data-row-id="${CSS.escape(rowId)}"]`);
   const form = JSON.parse(row.dataset.form);
 
   // Collect edited values
@@ -742,11 +742,14 @@ function cancelEdit(rowId) {
   filterAndRenderForms();
 }
 
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function showLoading(show) {

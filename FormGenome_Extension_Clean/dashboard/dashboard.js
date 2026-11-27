@@ -273,11 +273,11 @@ function renderCell(key, form) {
   // Formatting Logic
   if (key === 'source_url' || key === 'pdf_url') {
     const url = val || '';
-    if (url) {
-      content = `<a href="${url}" target="_blank" class="url-link" title="${url}">${url}</a>`;
-    } else {
-      content = '';
+    const href = safeHttpUrl(url);
+    if (href) {
+      return `<td><a href="${escapeHtml(href)}" target="_blank" class="url-link" title="${escapeHtml(url)}">${escapeHtml(url)}</a></td>`;
     }
+    content = url;
   } else if (typeof val === 'boolean') {
     content = val ? 'Yes' : 'No';
     return `<td class="${val ? 'yes' : 'no'}">${content}</td>`;
@@ -289,10 +289,7 @@ function renderCell(key, form) {
     content = new Date(val || Date.now()).toLocaleString();
   }
 
-  // Null/Undefined check
-  if (content === null || content === undefined) content = '';
-
-  return `<td>${content}</td>`;
+  return `<td>${escapeHtml(content)}</td>`;
 }
 
 // Global Sort Handler
@@ -364,6 +361,26 @@ function handleColumnDragEnd(e) {
 }
 
 // Utility
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeHttpUrl(value) {
+  if (typeof value !== 'string' || !value) return '';
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:' ? value : '';
+  } catch (e) {
+    return '';
+  }
+}
+
 function getFormDisplayName(form) {
   let name = form.pretty_title || form.form_title || form.form_name || form.title;
   if (!name || name.trim() === '') {
