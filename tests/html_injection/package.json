@@ -1,0 +1,7 @@
+{
+  "name": "genome-chrome-html-injection-tests",
+  "private": true,
+  "dependencies": {
+    "jsdom": "25.0.1"
+  }
+}
