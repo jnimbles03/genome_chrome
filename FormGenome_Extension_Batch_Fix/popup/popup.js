@@ -164,7 +164,7 @@ function renderPdfList() {
     // Determine badge text and style based on action
     let badge = '';
     if (pdf.language_count > 1) {
-      badge += `<span class="lang-badge" title="${pdf.language_count} language versions">+${pdf.language_count - 1} Langs</span>`;
+      badge += `<span class="lang-badge" title="${escapeHtml(pdf.language_count)} language versions">+${escapeHtml(pdf.language_count - 1)} Langs</span>`;
     }
 
     if (pdf.action === 'navigate') {
@@ -176,23 +176,23 @@ function renderPdfList() {
     // Determine button based on action
     let actionButton = '';
     if (isAnalyzed && !hasError) {
-      actionButton = `<button class="btn-view-results" data-url="${pdf.url}">View</button>`;
+      actionButton = `<button class="btn-view-results" data-url="${escapeHtml(pdf.url)}">View</button>`;
     } else if (pdf.action === 'navigate') {
-      actionButton = `<button class="btn-view-results warning" data-url="${pdf.url}" data-action="navigate" disabled title="Click the form link on the page first">Click Form Link</button>`;
+      actionButton = `<button class="btn-view-results warning" data-url="${escapeHtml(pdf.url)}" data-action="navigate" disabled title="Click the form link on the page first">Click Form Link</button>`;
     } else if (pdf.action === 'peek') {
-      actionButton = `<button class="btn-view-results peek" data-url="${pdf.url}" data-action="peek">Peek & Analyze</button>`;
+      actionButton = `<button class="btn-view-results peek" data-url="${escapeHtml(pdf.url)}" data-action="peek">Peek & Analyze</button>`;
     }
 
     item.innerHTML = `
-      <input type="checkbox" id="pdf_${index}" data-url="${pdf.url}" data-action="${pdf.action}" ${isAnalyzed ? '' : 'checked'}>
+      <input type="checkbox" id="pdf_${index}" data-url="${escapeHtml(pdf.url)}" data-action="${escapeHtml(pdf.action)}" ${isAnalyzed ? '' : 'checked'}>
       <div class="pdf-item-info">
-        <div class="pdf-item-name" title="${pdf.text}">
-            <a href="${pdf.url}" target="_blank" class="form-link" title="Open form in new tab">${pdf.text}</a>
+        <div class="pdf-item-name" title="${escapeHtml(pdf.text)}">
+            <a ${safeHttpUrl(pdf.url) ? `href="${escapeHtml(pdf.url)}"` : ''} target="_blank" rel="noopener noreferrer" class="form-link" title="Open form in new tab">${escapeHtml(pdf.text)}</a>
             ${badge}
         </div>
-        ${cached && cached.entity ? `<div class="pdf-item-entity">${cached.entity}</div>` : ''}
+        ${cached && cached.entity ? `<div class="pdf-item-entity">${escapeHtml(cached.entity)}</div>` : ''}
         <div class="pdf-item-status ${isAnalyzed ? 'analyzed' : ''} ${hasError ? 'error' : ''}">
-          ${isAnalyzed ? (hasError ? 'Error' : `✓ Analyzed (${cached.confidence_tier || 'Ready'})`) : 'Not analyzed'}
+          ${isAnalyzed ? (hasError ? 'Error' : `✓ Analyzed (${escapeHtml(cached.confidence_tier || 'Ready')})`) : 'Not analyzed'}
         </div>
       </div>
       ${actionButton}
@@ -513,6 +513,28 @@ function hideAll(ids) {
   ids.forEach(id => {
     document.getElementById(id).classList.add('hidden');
   });
+}
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Only absolute http(s) URLs may become links; javascript:, data: and
+// relative values are rendered as inert text instead.
+function safeHttpUrl(value) {
+  if (typeof value !== 'string' || value === '') return null;
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'http:' || protocol === 'https:' ? value : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 function extractFilename(url) {
